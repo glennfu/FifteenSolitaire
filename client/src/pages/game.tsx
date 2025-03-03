@@ -1,13 +1,15 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Board } from "@/components/game/board";
 import { Menu } from "@/components/game/menu";
 import { DebugPanel } from "@/components/game/debug-panel";
+import { WinDialog } from "@/components/game/win-dialog";
 import { useGameState } from "@/lib/game-state";
 import { Button } from "@/components/ui/button";
 import { Undo2 } from "lucide-react";
 
 export default function Game() {
   const { state, undo, initGame, loadGame } = useGameState();
+  const [showWinDialog, setShowWinDialog] = useState(false);
 
   useEffect(() => {
     const savedState = localStorage.getItem("gameState");
@@ -22,9 +24,21 @@ export default function Game() {
     }
   }, [loadGame, initGame]);
 
+  // Show win dialog when game is won
+  useEffect(() => {
+    if (state.gameWon && !showWinDialog) {
+      setShowWinDialog(true);
+    }
+  }, [state.gameWon]);
+
   const handleUndo = useCallback(() => {
     undo();
   }, [undo]);
+
+  const handleNewGame = useCallback(() => {
+    setShowWinDialog(false);
+    initGame();
+  }, [initGame]);
 
   return (
     <div className="fixed inset-0 bg-background">
@@ -53,6 +67,11 @@ export default function Game() {
           </Button>
         </div>
       </div>
+
+      <WinDialog 
+        isOpen={showWinDialog} 
+        onNewGame={handleNewGame}
+      />
     </div>
   );
 }

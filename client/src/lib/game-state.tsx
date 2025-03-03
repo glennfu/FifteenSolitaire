@@ -42,12 +42,32 @@ function shuffleDeck(): Card[] {
   return deck;
 }
 
+interface GamePile {
+  id: number;
+  cards: Card[];
+  isEmpty: boolean;
+}
+
+interface GameState {
+  piles: GamePile[];
+  moveHistory: {
+    fromPile: number;
+    toPile: number;
+    card: Card;
+  }[];
+  gamesWon: number;
+  debugMode: boolean;
+  gameWon: boolean;
+}
+
+
 export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GameState>({
     piles: [],
     moveHistory: [],
     gamesWon: 0,
-    debugMode: false
+    debugMode: false,
+    gameWon: false
   });
 
   const initGame = useCallback(() => {
@@ -70,7 +90,8 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     setState(prev => ({
       ...prev,
       piles,
-      moveHistory: []
+      moveHistory: [],
+      gameWon: false
     }));
   }, []);
 
@@ -105,13 +126,13 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
       const newPiles = [...prev.piles];
       const movingCard = fromPile.cards[fromPile.cards.length - 1];
-      
+
       // Remove card from source pile
       newPiles[pileId] = {
         ...fromPile,
         cards: fromPile.cards.slice(0, -1)
       };
-      
+
       // Add card to target pile
       newPiles[validMove] = {
         ...newPiles[validMove],
@@ -135,7 +156,8 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         piles: newPiles,
         moveHistory: newHistory,
-        gamesWon: hasWon ? prev.gamesWon + 1 : prev.gamesWon
+        gamesWon: hasWon ? prev.gamesWon + 1 : prev.gamesWon,
+        gameWon: hasWon
       };
     });
   }, [validateMove]);

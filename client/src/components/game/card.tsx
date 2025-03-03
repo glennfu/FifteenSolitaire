@@ -10,8 +10,8 @@ interface CardProps {
 
 export function Card({ card, onClick, className, disabled }: CardProps) {
   const suitColor = card.suit === CardSuit.Hearts || card.suit === CardSuit.Diamonds
-    ? "text-red-500"
-    : "text-slate-900";
+    ? "text-red-500 dark:text-red-400"
+    : "text-slate-900 dark:text-slate-100";
 
   const suitSymbol = {
     [CardSuit.Hearts]: "♥",
@@ -24,17 +24,27 @@ export function Card({ card, onClick, className, disabled }: CardProps) {
     [CardValue.Ace]: "A",
     [CardValue.Jack]: "J",
     [CardValue.Queen]: "Q",
-    [CardValue.King]: "K"
-  }[card.value] || card.value.toString();
+    [CardValue.King]: "K",
+    [CardValue.Two]: "2",
+    [CardValue.Three]: "3",
+    [CardValue.Four]: "4",
+    [CardValue.Five]: "5",
+    [CardValue.Six]: "6",
+    [CardValue.Seven]: "7",
+    [CardValue.Eight]: "8",
+    [CardValue.Nine]: "9",
+    [CardValue.Ten]: "10"
+  }[card.value];
 
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-[4.5rem] h-[6rem] bg-white rounded-lg shadow-md border-2 border-gray-200",
+        "w-[4.5rem] h-[6rem] rounded-lg shadow-md border-2",
         "relative",
         "transition-transform hover:scale-105 active:scale-95",
+        "bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700",
         disabled ? "opacity-75" : "opacity-100",
         className
       )}
