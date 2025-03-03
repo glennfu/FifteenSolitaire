@@ -1,0 +1,92 @@
+interface Card {
+  rank: number;
+  suit: string;
+}
+
+type Pile = Card[];
+type State = Pile[];
+
+interface Move {
+  from: number;
+  to: number;
+}
+
+function isGoal(state: State): boolean {
+  let completePiles = 0;
+  for (const pile of state) {
+    if (pile.length === 0) continue;
+    if (pile.length !== 4) return false;
+    if (!pile.every((c) => c.rank === pile[0].rank)) return false;
+    completePiles++;
+  }
+  return completePiles === 13;
+}
+
+function getValidMoves(state: State): Move[] {
+  const moves: Move[] = [];
+  for (let i = 0; i < state.length; i++) {
+    if (state[i].length === 0) continue;
+    const card = state[i][state[i].length - 1];
+    for (let j = 0; j < state.length; j++) {
+      if (i === j) continue;
+      if (state[j].length === 0) {
+        moves.push({ from: i, to: j });
+      } else {
+        const top = state[j][state[j].length - 1];
+        if (top.rank === card.rank && state[j].length < 4) {
+          moves.push({ from: i, to: j });
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+function applyMove(state: State, move: Move): State {
+  const newState = state.map(pile => pile.slice());
+  const card = newState[move.from].pop();
+  if (card) newState[move.to].push(card);
+  return newState;
+}
+
+function stateToString(state: State): string {
+  return state
+    .map(pile => pile.map(card => card.rank).join(","))
+    .join("|");
+}
+
+function solve(state: State, visited = new Set<string>(), path: Move[] = []): Move[] | null {
+  if (isGoal(state)) return path;
+  const key = stateToString(state);
+  if (visited.has(key)) return null;
+  visited.add(key);
+  for (const move of getValidMoves(state)) {
+    const nextState = applyMove(state, move);
+    const result = solve(nextState, visited, [...path, move]);
+    if (result) return result;
+  }
+  return null;
+}
+
+// Example starting state (15 piles of 4 cards each)
+// Replace with the actual starting configuration
+const initialState: State = [
+  [{ rank: 1, suit: "♠" }, { rank: 2, suit: "♠" }, { rank: 3, suit: "♠" }, { rank: 4, suit: "♠" }],
+  [{ rank: 5, suit: "♥" }, { rank: 6, suit: "♥" }, { rank: 7, suit: "♥" }, { rank: 8, suit: "♥" }],
+  [{ rank: 9, suit: "♦" }, { rank: 10, suit: "♦" }, { rank: 11, suit: "♦" }, { rank: 12, suit: "♦" }],
+  [{ rank: 13, suit: "♣" }, { rank: 1, suit: "♣" }, { rank: 2, suit: "♣" }, { rank: 3, suit: "♣" }],
+  [{ rank: 4, suit: "♣" }, { rank: 5, suit: "♣" }, { rank: 6, suit: "♣" }, { rank: 7, suit: "♣" }],
+  [{ rank: 8, suit: "♣" }, { rank: 9, suit: "♣" }, { rank: 10, suit: "♣" }, { rank: 11, suit: "♣" }],
+  [{ rank: 12, suit: "♣" }, { rank: 13, suit: "♠" }, { rank: 1, suit: "♥" }, { rank: 2, suit: "♥" }],
+  [{ rank: 3, suit: "♥" }, { rank: 4, suit: "♥" }, { rank: 5, suit: "♦" }, { rank: 6, suit: "♦" }],
+  [{ rank: 7, suit: "♦" }, { rank: 8, suit: "♦" }, { rank: 9, suit: "♥" }, { rank: 10, suit: "♥" }],
+  [{ rank: 11, suit: "♥" }, { rank: 12, suit: "♥" }, { rank: 13, suit: "♥" }, { rank: 1, suit: "♦" }],
+  [{ rank: 2, suit: "♦" }, { rank: 3, suit: "♦" }, { rank: 4, suit: "♦" }, { rank: 5, suit: "♠" }],
+  [{ rank: 6, suit: "♠" }, { rank: 7, suit: "♠" }, { rank: 8, suit: "♠" }, { rank: 9, suit: "♠" }],
+  [{ rank: 10, suit: "♠" }, { rank: 11, suit: "♠" }, { rank: 12, suit: "♠" }, { rank: 13, suit: "♦" }],
+  [{ rank: 1, suit: "♦" }, { rank: 2, suit: "♣" }, { rank: 3, suit: "♣" }, { rank: 4, suit: "♣" }],
+  [{ rank: 5, suit: "♦" }, { rank: 6, suit: "♦" }, { rank: 7, suit: "♣" }, { rank: 8, suit: "♣" }]
+];
+
+const solution = solve(initialState);
+console.log(solution);

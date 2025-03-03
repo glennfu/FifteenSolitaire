@@ -62,6 +62,49 @@ interface GameState {
 }
 
 
+function isGoalState(piles: GamePile[]): boolean {
+  return piles.every(pile => 
+    pile.cards.length === 0 || 
+    (pile.cards.length === 4 && pile.cards.every(card => card.value === pile.cards[0].value))
+  );
+}
+
+function getValidMoves(piles: GamePile[]): {fromPile: number, toPile: number}[] {
+  const moves: {fromPile: number, toPile: number}[] = [];
+
+  for (let fromPile = 0; fromPile < piles.length; fromPile++) {
+    if (piles[fromPile].cards.length === 0) continue;
+
+    const sourceCard = piles[fromPile].cards[piles[fromPile].cards.length - 1];
+
+    for (let toPile = 0; toPile < piles.length; toPile++) {
+      if (fromPile === toPile) continue;
+
+      // Can always move to empty pile
+      if (piles[toPile].cards.length === 0) {
+        moves.push({ fromPile, toPile });
+        continue;
+      }
+
+      // Can only stack on matching values when pile isn't full
+      const targetPile = piles[toPile];
+      const targetCard = targetPile.cards[targetPile.cards.length - 1];
+
+      if (targetCard.value === sourceCard.value && targetPile.cards.length < 4) {
+        moves.push({ fromPile, toPile });
+      }
+    }
+  }
+
+  return moves;
+}
+
+function pileStateToString(piles: GamePile[]): string {
+  return piles
+    .map(pile => pile.cards.map(card => `${card.value}-${card.suit}`).join(","))
+    .join("|");
+}
+
 export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GameState>({
     piles: [],
@@ -209,62 +252,49 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const solve = useCallback(async () => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Find all cards that could form complete sets
-    const findCompletableSet = () => {
-      // Count occurrences of each card value
-      const valueCounts = new Map<CardValue, {
-        count: number,
-        piles: number[]
-      }>();
+    async function findSolution(
+      currentPiles: GamePile[],
+      visited = new Set<string>(),
+      path: {fromPile: number, toPile: number}[] = []
+    ): Promise<{fromPile: number, toPile: number}[] | null> {
+      if (isGoalState(currentPiles)) return path;
 
-      state.piles.forEach((pile, pileIndex) => {
-        if (pile.cards.length === 0) return;
-        const topCard = pile.cards[pile.cards.length - 1];
+      const stateKey = pileStateToString(currentPiles);
+      if (visited.has(stateKey)) return null;
+      visited.add(stateKey);
 
-        if (!valueCounts.has(topCard.value)) {
-          valueCounts.set(topCard.value, { count: 0, piles: [] });
-        }
+      const validMoves = getValidMoves(currentPiles);
 
-        const entry = valueCounts.get(topCard.value)!;
-        entry.count++;
-        entry.piles.push(pileIndex);
-      });
+      for (const move of validMoves) {
+        // Deep clone the current state
+        const nextPiles = currentPiles.map(pile => ({
+          ...pile,
+          cards: [...pile.cards]
+        }));
 
-      // Find sets that can be completed
-      for (const [value, { count, piles }] of valueCounts.entries()) {
-        if (count >= 2) {  // Need at least 2 cards to start making progress
-          // Find if there's a pile that already has multiple matching cards
-          for (const toPile of piles) {
-            const targetPile = state.piles[toPile];
-            if (targetPile.cards.length > 1 && 
-                targetPile.cards.length < 4 && 
-                targetPile.cards.every(c => c.value === value)) {
-              // Look for a matching card we can move here
-              for (const fromPile of piles) {
-                if (fromPile !== toPile && validateMove(fromPile, toPile)) {
-                  return { fromPile, toPile };
-                }
-              }
-            }
-          }
-        }
+        // Apply the move
+        const movingCard = nextPiles[move.fromPile].cards.pop()!;
+        nextPiles[move.toPile].cards.push(movingCard);
+
+        const result = await findSolution(nextPiles, visited, [...path, move]);
+        if (result) return result;
+
+        await sleep(50); // Small delay to prevent blocking
       }
 
       return null;
-    };
+    }
 
-    let moveCount = 0;
-    const maxMoves = 50; // Prevent infinite loops
+    // Start the solving process
+    const solution = await findSolution(state.piles);
+    if (!solution) return;
 
-    while (moveCount < maxMoves && !state.gameWon) {
-      const move = findCompletableSet();
-      if (!move) break;
-
+    // Execute the solution moves with animation delays
+    for (const move of solution) {
       makeMove(move.fromPile);
       await sleep(300); // Match animation duration
-      moveCount++;
     }
-  }, [state, makeMove, validateMove]);
+  }, [state.piles, makeMove]);
 
   // Save state to localStorage whenever it changes
   useCallback(() => {
