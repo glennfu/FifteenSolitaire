@@ -181,122 +181,125 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const solve = useCallback(async () => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Simple state with just card values (ranks)
-    type SimpleState = number[][];
-    type Move = { from: number, to: number };
+    // State types matching the example algorithm
+    type Card = { rank: number; };
+    type Pile = Card[];
+    type State = Pile[];
+    type Move = { from: number; to: number; };
 
-    function toSimpleState(piles: GamePile[]): SimpleState {
-      return piles.map(pile => pile.cards.map(card => card.value));
+    function toSimpleState(): State {
+      return state.piles.map(pile =>
+        pile.cards.map(card => ({ rank: card.value }))
+      );
     }
 
-    function isGoal(state: SimpleState): boolean {
-      let completePiles = 0;
-      for (const pile of state) {
-        if (pile.length === 0) continue;
-        if (pile.length === 4 && pile.every(v => v === pile[0])) {
-          completePiles++;
-        }
-      }
-      return completePiles === 13;
+    function canMove(fromPile: Pile, toPile: Pile): boolean {
+      if (fromPile.length === 0) return false;
+      const fromCard = fromPile[fromPile.length - 1];
+
+      // Can move to empty pile
+      if (toPile.length === 0) return true;
+
+      // Can only stack on matching rank if pile isn't full
+      if (toPile.length >= 4) return false;
+      const toCard = toPile[toPile.length - 1];
+      return toCard.rank === fromCard.rank;
     }
 
-    function getValidMoves(state: SimpleState): Move[] {
+    function getValidMoves(state: State): Move[] {
       const moves: Move[] = [];
+
       for (let from = 0; from < state.length; from++) {
         if (state[from].length === 0) continue;
-        const card = state[from][state[from].length - 1];
 
         for (let to = 0; to < state.length; to++) {
           if (from === to) continue;
 
-          if (state[to].length === 0) {
-            // Only move to empty pile if there are matching cards elsewhere
-            const hasMatches = state.some((pile, i) =>
-              i !== from && i !== to &&
-              pile.length > 0 && pile[pile.length - 1] === card
-            );
-            if (hasMatches) {
+          if (canMove(state[from], state[to])) {
+            // For empty pile moves, verify there are matching cards elsewhere
+            if (state[to].length === 0) {
+              const sourceCard = state[from][state[from].length - 1];
+              const hasMatches = state.some((pile, i) =>
+                i !== from && i !== to &&
+                pile.length > 0 &&
+                pile[pile.length - 1].rank === sourceCard.rank
+              );
+              if (hasMatches) {
+                moves.push({ from, to });
+              }
+            } else {
               moves.push({ from, to });
             }
-          } else if (state[to].length < 4 && state[to][state[to].length - 1] === card) {
-            moves.push({ from, to });
           }
         }
       }
+
       return moves;
     }
 
-    function applyMove(state: SimpleState, move: Move): SimpleState {
+    function applyMove(state: State, move: Move): State {
       const newState = state.map(pile => [...pile]);
       const card = newState[move.from].pop()!;
       newState[move.to].push(card);
       return newState;
     }
 
-    function stateToString(state: SimpleState): string {
+    function isGoal(state: State): boolean {
+      let completePiles = 0;
+      for (const pile of state) {
+        if (pile.length === 0) continue;
+        if (pile.length === 4 && pile.every(c => c.rank === pile[0].rank)) {
+          completePiles++;
+        }
+      }
+      return completePiles === 13;
+    }
+
+    function stateToString(state: State): string {
+      // Sort piles and cards within piles for consistent comparison
       return state
-        .map(pile =>
-          pile.length === 0 ? '-' :
-            [...pile].sort((a, b) => a - b).join(',')
+        .map(pile => pile.length === 0 ? '-' : [...pile]
+          .map(c => c.rank)
+          .sort((a, b) => a - b)
+          .join(',')
         )
         .sort()
         .join('|');
     }
 
-    // Start solving
     console.log("Starting solve...");
-    const initialState = toSimpleState(state.piles);
-    console.log("Initial state:", initialState);
+    const initialState = toSimpleState();
+    console.log("Initial state:");
+    initialState.forEach((pile, i) => {
+      console.log(`Pile ${i}: ${pile.map(c => c.rank).join(',')}`);
+    });
 
-    const maxDepth = 260; // 5 moves per card * 52 cards
+    const maxMoves = 260; // 5 moves * 52 cards
     const visited = new Set<string>();
-    const stack: Array<{
-      state: SimpleState,
-      moves: Move[],
-      score: number
-    }> = [{
+    const queue: Array<{ state: State, path: Move[] }> = [{
       state: initialState,
-      moves: [],
-      score: 0
+      path: []
     }];
 
-    function evaluateState(state: SimpleState): number {
-      let score = 0;
-      for (const pile of state) {
-        if (pile.length === 0) continue;
-        if (pile.length === 4 && pile.every(v => v === pile[0])) {
-          score += 1000; // Complete set
-        } else {
-          // Count matching pairs
-          const topCard = pile[pile.length - 1];
-          const matches = pile.filter(v => v === topCard).length;
-          score += matches * 10;
-        }
-      }
-      return score;
-    }
-
-    let movesChecked = 0;
-    while (stack.length > 0) {
-      movesChecked++;
-      if (movesChecked % 1000 === 0) {
-        console.log(`Checked ${movesChecked} moves, Stack: ${stack.length}, Visited: ${visited.size}`);
+    let iterations = 0;
+    while (queue.length > 0) {
+      iterations++;
+      if (iterations % 1000 === 0) {
+        console.log(`Iteration ${iterations}, Queue size: ${queue.length}, Visited states: ${visited.size}`);
         await sleep(0);
       }
 
-      // Sort by score to try most promising states first
-      stack.sort((a, b) => b.score - a.score);
-      const current = stack.pop()!;
+      const current = queue.shift()!;
 
-      if (current.moves.length > maxDepth) {
-        console.log("Exceeded max depth, backtracking...");
+      if (current.path.length > maxMoves) {
+        console.log("Exceeded max moves, skipping state");
         continue;
       }
 
       if (isGoal(current.state)) {
-        console.log("Found solution!");
-        for (const move of current.moves) {
-          console.log(`Making move: ${move.from} -> ${move.to}`);
+        console.log(`Found solution with ${current.path.length} moves!`);
+        console.log("Solution:", current.path);
+        for (const move of current.path) {
           makeMove(move.from);
           await sleep(300);
         }
@@ -308,22 +311,32 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       visited.add(stateKey);
 
       const moves = getValidMoves(current.state);
-      for (const move of moves) {
-        if (!validateMove(move.from, move.to)) continue;
+      if (iterations === 1 || iterations % 100 === 0) {
+        console.log(`At iteration ${iterations}, depth ${current.path.length}:`);
+        console.log(`Found ${moves.length} valid moves:`, moves);
+      }
 
+      // Sort moves to prioritize completing sets
+      const sortedMoves = moves.sort((a, b) => {
+        const stateA = applyMove(current.state, a);
+        const stateB = applyMove(current.state, b);
+        const completeA = stateA[a.to].length === 4;
+        const completeB = stateB[b.to].length === 4;
+        return Number(completeB) - Number(completeA);
+      });
+
+      for (const move of sortedMoves) {
         const nextState = applyMove(current.state, move);
-        const score = evaluateState(nextState);
-
-        stack.push({
+        queue.push({
           state: nextState,
-          moves: [...current.moves, move],
-          score
+          path: [...current.path, move]
         });
       }
     }
 
+    console.log(`Search terminated after ${iterations} iterations`);
     console.log("No solution found");
-  }, [state.piles, makeMove, validateMove]);
+  }, [state.piles, makeMove]);
 
   // Save state to localStorage whenever it changes
   useCallback(() => {
