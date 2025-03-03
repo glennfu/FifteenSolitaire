@@ -4,7 +4,8 @@ import {
   Card,
   CardSuit,
   CardValue,
-  gameStateSchema
+  gameStateSchema,
+  GamePile
 } from "@shared/schema";
 
 interface GameContextType {
@@ -243,10 +244,14 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggleDebug = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      debugMode: !prev.debugMode
-    }));
+    setState(prev => {
+      const newState = {
+        ...prev,
+        debugMode: !prev.debugMode
+      };
+      console.log("Debug mode toggled:", newState.debugMode);
+      return newState;
+    });
   }, []);
 
   const solve = useCallback(async () => {
