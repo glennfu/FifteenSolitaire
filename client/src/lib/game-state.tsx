@@ -251,121 +251,90 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const solve = useCallback(async () => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    function isGoal(piles: GamePile[]): boolean {
+    // Simple state representation
+    type SimplePile = number[]; // Just card values
+    type SimpleState = SimplePile[];
+
+    function simplifyState(piles: GamePile[]): SimpleState {
+      return piles.map(pile => pile.cards.map(card => card.value));
+    }
+
+    function isGoal(state: SimpleState): boolean {
       let completePiles = 0;
-      for (const pile of piles) {
-        if (pile.cards.length === 0) continue;
-        if (pile.cards.length !== 4) return false;
-        if (!pile.cards.every(c => c.value === pile.cards[0].value)) return false;
+      for (const pile of state) {
+        if (pile.length === 0) continue;
+        if (pile.length !== 4) return false;
+        if (!pile.every(v => v === pile[0])) return false;
         completePiles++;
       }
       return completePiles === 13;
     }
 
-    function applyMove(piles: GamePile[], move: {fromPile: number, toPile: number}): GamePile[] {
-      const newPiles = piles.map(pile => ({
-        ...pile,
-        cards: [...pile.cards]
-      }));
+    function getValidMoves(state: SimpleState): {from: number, to: number}[] {
+      const moves: {from: number, to: number}[] = [];
+      for (let i = 0; i < state.length; i++) {
+        if (state[i].length === 0) continue;
+        const card = state[i][state[i].length - 1];
 
-      const movingCard = newPiles[move.fromPile].cards.pop()!;
-      newPiles[move.toPile].cards.push(movingCard);
-      return newPiles;
-    }
+        for (let j = 0; j < state.length; j++) {
+          if (i === j) continue;
 
-    function getValidMovesForState(piles: GamePile[]): {fromPile: number, toPile: number}[] {
-      const moves: {fromPile: number, toPile: number}[] = [];
-
-      for (let fromPile = 0; fromPile < piles.length; fromPile++) {
-        if (piles[fromPile].cards.length === 0) continue;
-
-        const card = piles[fromPile].cards[piles[fromPile].cards.length - 1];
-
-        for (let toPile = 0; toPile < piles.length; toPile++) {
-          if (fromPile === toPile) continue;
-
-          const targetPile = piles[toPile];
-
-          // Can move to empty pile
-          if (targetPile.cards.length === 0) {
-            moves.push({ fromPile, toPile });
-            continue;
-          }
-
-          // Can stack on matching values if pile isn't full
-          if (targetPile.cards.length < 4) {
-            const topCard = targetPile.cards[targetPile.cards.length - 1];
-            if (topCard.value === card.value) {
-              moves.push({ fromPile, toPile });
+          if (state[j].length === 0) {
+            moves.push({ from: i, to: j });
+          } else {
+            const top = state[j][state[j].length - 1];
+            if (top === card && state[j].length < 4) {
+              moves.push({ from: i, to: j });
             }
           }
         }
       }
-
       return moves;
     }
 
-    function stateToString(piles: GamePile[]): string {
-      return piles
-        .map(pile => pile.cards.length === 0 ? "-" :
-          pile.cards.map(card => `${card.value}`).join(","))
-        .join("|");
+    function applyMove(state: SimpleState, move: {from: number, to: number}): SimpleState {
+      const newState = state.map(pile => [...pile]);
+      const card = newState[move.from].pop()!;
+      newState[move.to].push(card);
+      return newState;
     }
 
-    async function findSolution(
-      currentPiles: GamePile[],
-      visited = new Set<string>(),
-      path: {fromPile: number, toPile: number}[] = [],
-      depth = 0
-    ): Promise<{fromPile: number, toPile: number}[] | null> {
-      // Log progress every 1000 states
-      if (visited.size % 1000 === 0) {
-        console.log(`Search progress:
-          States visited: ${visited.size}
-          Current depth: ${depth}
-          Current path length: ${path.length}
-        `);
-      }
+    function stateToString(state: SimpleState): string {
+      return state.map(pile => pile.join(',')).join('|');
+    }
 
-      if (isGoal(currentPiles)) {
-        console.log("Found solution!");
-        return path;
-      }
+    // Note: This matches the provided algorithm exactly
+    function solve(state: SimpleState, visited = new Set<string>(), path: {from: number, to: number}[] = []): {from: number, to: number}[] | null {
+      if (isGoal(state)) return path;
 
-      const stateKey = stateToString(currentPiles);
-      if (visited.has(stateKey)) return null;
-      visited.add(stateKey);
+      const key = stateToString(state);
+      if (visited.has(key)) return null;
+      visited.add(key);
 
-      const validMoves = getValidMovesForState(currentPiles);
-      console.log(`Depth ${depth}: Found ${validMoves.length} valid moves`);
-
-      for (const move of validMoves) {
-        const nextPiles = applyMove(currentPiles, move);
-        console.log(`Trying move: ${move.fromPile} -> ${move.toPile}`);
-
-        const solution = await findSolution(nextPiles, visited, [...path, move], depth + 1);
-        if (solution) return solution;
-
-        // Add longer sleep to prevent UI freeze and allow logs to be visible
-        await sleep(10);
+      for (const move of getValidMoves(state)) {
+        const nextState = applyMove(state, move);
+        const result = solve(nextState, visited, [...path, move]);
+        if (result) return result;
       }
 
       return null;
     }
 
-    console.log("Starting solve algorithm");
-    const solution = await findSolution(state.piles);
+    console.log("Starting solve...");
+    const initialState = simplifyState(state.piles);
+    console.log("Initial state:", initialState);
+
+    const solution = solve(initialState);
 
     if (solution) {
       console.log("Solution found:", solution);
-      // Execute the solution moves with animation delays
+      // Execute the solution with animations
       for (const move of solution) {
-        console.log(`Executing move: ${move.fromPile} -> ${move.toPile}`);
-        makeMove(move.fromPile);
+        makeMove(move.from);
         await sleep(300); // Animation delay
       }
     } else {
-      console.log("No solution found after searching");
+      console.log("No solution found");
     }
   }, [state.piles, makeMove]);
 
