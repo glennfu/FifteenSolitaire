@@ -15,7 +15,7 @@ export function Pile({ pile, onCardClick, className, disabled }: PileProps) {
   return (
     <div 
       className={cn(
-        "relative w-[4.5rem] h-[6rem]",
+        "relative w-[4.5rem] min-h-[9rem]", // Increased minimum height to accommodate stacked cards
         pile.isEmpty && "border-2 border-dashed border-gray-300 rounded-lg",
         className
       )}
