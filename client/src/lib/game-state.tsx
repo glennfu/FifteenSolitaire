@@ -181,67 +181,92 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const solve = useCallback(async () => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // State types matching the example algorithm
-    type Card = { rank: number; };
-    type Pile = Card[];
-    type State = Pile[];
-    type Move = { from: number; to: number; };
+    // Simple state with just card values (ranks)
+    type State = number[][];
+    type Move = { from: number, to: number };
 
     function toSimpleState(): State {
-      return state.piles.map(pile =>
-        pile.cards.map(card => ({ rank: card.value }))
+      return state.piles.map(pile => pile.cards.map(card => card.value));
+    }
+
+    function getCompleteSets(state: State): number {
+      return state.filter(pile =>
+        pile.length === 4 && pile.every(v => v === pile[0])
+      ).length;
+    }
+
+    function logMove(state: State, move: Move) {
+      const fromPile = state[move.from];
+      const toPile = state[move.to];
+      const movingCard = fromPile[fromPile.length - 1];
+      const toCard = toPile.length > 0 ? toPile[toPile.length - 1] : null;
+      console.log(
+        `Moving ${movingCard} from pile ${move.from} (${fromPile.join(',')}) ` +
+        `to pile ${move.to} (${toPile.length > 0 ? toPile.join(',') : 'empty'})`
       );
     }
 
-    function canMove(fromPile: Pile, toPile: Pile): boolean {
-      if (fromPile.length === 0) return false;
-      const fromCard = fromPile[fromPile.length - 1];
-
-      // Can move to empty pile
-      if (toPile.length === 0) {
-        // Only if there are matching cards elsewhere
-        return true;
-      }
-
-      // Can only stack on matching rank if pile isn't full
-      if (toPile.length >= 4) return false;
-      const toCard = toPile[toPile.length - 1];
-      return toCard.rank === fromCard.rank;
+    function stateToString(state: State): string {
+      // Sort piles by content to detect equivalent states
+      return state
+        .map(pile => pile.length === 0 ? '-' : [...pile].sort((a, b) => a - b).join(','))
+        .sort()
+        .join('|');
     }
 
     function getValidMoves(state: State): Move[] {
       const moves: Move[] = [];
+      const completedRanks = new Set<number>();
+
+      // First identify completed ranks
+      state.forEach(pile => {
+        if (pile.length === 4 && pile.every(v => v === pile[0])) {
+          completedRanks.add(pile[0]);
+        }
+      });
+
+      // Find and sort moves by priority
+      const prioritizedMoves: Move[] = [];
+      const otherMoves: Move[] = [];
 
       for (let from = 0; from < state.length; from++) {
         if (state[from].length === 0) continue;
-        const sourceCard = state[from][state[from].length - 1];
+        const card = state[from][state[from].length - 1];
+
+        // Skip moving cards that are part of completed ranks
+        if (completedRanks.has(card)) continue;
 
         for (let to = 0; to < state.length; to++) {
           if (from === to) continue;
 
-          // First verify move with game rules
+          // Skip if the move wouldn't be valid in the game
           if (!validateMove(from, to)) continue;
 
           if (state[to].length === 0) {
-            // Only move to empty pile if we have matching cards elsewhere
+            // For empty piles, verify there are other matching cards
             const hasMatches = state.some((pile, i) =>
               i !== from && i !== to &&
               pile.length > 0 &&
-              pile[pile.length - 1].rank === sourceCard.rank
+              pile[pile.length - 1] === card
             );
             if (hasMatches) {
-              moves.push({ from, to });
+              otherMoves.push({ from, to });
             }
           } else if (state[to].length < 4) {
-            const targetCard = state[to][state[to].length - 1];
-            if (targetCard.rank === sourceCard.rank) {
-              moves.push({ from, to });
+            const topCard = state[to][state[to].length - 1];
+            if (topCard === card) {
+              // Prioritize moves that build/complete sets
+              if (state[to].length === 3) {
+                prioritizedMoves.unshift({ from, to });
+              } else {
+                prioritizedMoves.push({ from, to });
+              }
             }
           }
         }
       }
 
-      return moves;
+      return [...prioritizedMoves, ...otherMoves];
     }
 
     function applyMove(state: State, move: Move): State {
@@ -251,116 +276,81 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       return newState;
     }
 
-    function isGoal(state: State): boolean {
-      let completePiles = 0;
-      for (const pile of state) {
-        if (pile.length === 0) continue;
-        if (pile.length === 4 && pile.every(c => c.rank === pile[0].rank)) {
-          completePiles++;
-        }
-      }
-      return completePiles === 13;
-    }
-
-    function stateToString(state: State): string {
-      // Sort piles and cards within piles for consistent comparison
-      return state
-        .map(pile =>
-          pile.length === 0 ? '-' :
-            [...pile].map(c => c.rank).sort((a, b) => a - b).join(',')
-        )
-        .sort()
-        .join('|');
-    }
-
-    console.log("Starting solve...");
-    const initialState = toSimpleState();
-    console.log("Initial state:");
-    initialState.forEach((pile, i) => {
-      console.log(`Pile ${i}: ${pile.map(c => c.rank).join(',')}`);
-    });
-
-    const maxMoves = 260; // 5 moves * 52 cards
-    const visited = new Set<string>();
-    const queue: Array<{ state: State, path: Move[] }> = [{
-      state: initialState,
-      path: []
-    }];
-
-    let iterations = 0;
-    while (queue.length > 0) {
-      iterations++;
-      if (iterations % 1000 === 0) {
-        console.log(`Iteration ${iterations}, Queue size: ${queue.length}, Visited states: ${visited.size}`);
+    async function dfs(
+      state: State,
+      path: Move[] = [],
+      visited = new Set<string>(),
+      depth = 0
+    ): Promise<Move[] | null> {
+      if (depth % 10 === 0) {
+        console.log(`\nDepth ${depth}:`);
+        console.log(`Complete sets: ${getCompleteSets(state)}`);
+        console.log(`Visited states: ${visited.size}`);
         await sleep(0);
       }
 
-      const current = queue.shift()!;
-
-      if (current.path.length > maxMoves) {
-        console.log("Exceeded max moves, skipping state");
-        continue;
+      // Check for solution
+      const completeSets = getCompleteSets(state);
+      if (completeSets === 13) {
+        console.log("\nFound winning state!");
+        return path;
       }
 
-      if (isGoal(current.state)) {
-        console.log(`Found solution with ${current.path.length} moves!`);
-        console.log("Executing solution moves:");
-
-        // Execute each move with proper validation and delay
-        for (const move of current.path) {
-          // Debug output for move
-          const fromPile = current.state[move.from];
-          const movingCard = fromPile[fromPile.length - 1];
-          console.log(`Moving ${movingCard.rank} from pile ${move.from} to ${move.to}`);
-
-          // Double check move validity
-          if (!validateMove(move.from, move.to)) {
-            console.error(`Invalid move detected: ${move.from} -> ${move.to}`);
-            console.error('State at invalid move:', current.state.map((pile, i) => 
-              `Pile ${i}: ${pile.map(c => c.rank).join(',')}`
-            ));
-            return;
-          }
-
-          // Execute move
-          makeMove(move.from);
-          await sleep(300); // Animation delay
-        }
-        return;
-      }
-
-      const stateKey = stateToString(current.state);
-      if (visited.has(stateKey)) continue;
+      // Get state signature and check for cycles
+      const stateKey = stateToString(state);
+      if (visited.has(stateKey)) return null;
       visited.add(stateKey);
 
-      const moves = getValidMoves(current.state);
-      if (iterations === 1 || iterations % 100 === 0) {
-        console.log(`At iteration ${iterations}, depth ${current.path.length}:`);
-        console.log(`Found ${moves.length} valid moves:`, moves);
+      // Get valid moves
+      const moves = getValidMoves(state);
+
+      // Try each move
+      for (const move of moves) {
+        // Log move details
+        if (depth % 10 === 0) {
+          logMove(state, move);
+        }
+
+        const nextState = applyMove(state, move);
+        const nextSets = getCompleteSets(nextState);
+
+        // Log when we complete a new set
+        if (nextSets > completeSets) {
+          console.log(`\nCompleted new set at depth ${depth}:`);
+          logMove(state, move);
+        }
+
+        // Try this move
+        const result = await dfs(nextState, [...path, move], visited, depth + 1);
+        if (result) return result;
       }
 
-      // Sort moves to prioritize completing sets
-      const sortedMoves = moves.sort((a, b) => {
-        const stateA = applyMove(current.state, a);
-        const stateB = applyMove(current.state, b);
-        // Prioritize moves that complete sets
-        const completeA = stateA[a.to].length === 4;
-        const completeB = stateB[b.to].length === 4;
-        return Number(completeB) - Number(completeA);
-      });
-
-      for (const move of sortedMoves) {
-        const nextState = applyMove(current.state, move);
-        queue.push({
-          state: nextState,
-          path: [...current.path, move]
-        });
-      }
+      return null;
     }
 
-    console.log(`Search terminated after ${iterations} iterations`);
-    console.log("No solution found");
-  }, [state, makeMove, validateMove]);
+    // Start solving
+    console.log("\nStarting solve...");
+    const initialState = toSimpleState();
+    console.log("Initial state:", initialState);
+
+    const solution = await dfs(initialState);
+
+    if (solution) {
+      console.log(`\nFound solution with ${solution.length} moves!`);
+      for (const move of solution) {
+        logMove(initialState, move);
+        if (validateMove(move.from, move.to)) {
+          makeMove(move.from);
+          await sleep(300);
+        } else {
+          console.error("Invalid move in solution:", move);
+          return;
+        }
+      }
+    } else {
+      console.log("\nNo solution found");
+    }
+  }, [state.piles, makeMove, validateMove]);
 
   // Save state to localStorage whenever it changes
   useCallback(() => {
