@@ -43,31 +43,6 @@ function shuffleDeck(): Card[] {
   return deck;
 }
 
-interface GamePile {
-  id: number;
-  cards: Card[];
-  isEmpty: boolean;
-}
-
-interface GameState {
-  piles: GamePile[];
-  moveHistory: {
-    fromPile: number;
-    toPile: number;
-    card: Card;
-  }[];
-  gamesWon: number;
-  debugMode: boolean;
-  gameWon: boolean;
-}
-
-function isGoalState(piles: GamePile[]): boolean {
-  return piles.every(pile =>
-    pile.cards.length === 0 ||
-    (pile.cards.length === 4 && pile.cards.every(card => card.value === pile.cards[0].value))
-  );
-}
-
 export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GameState>({
     piles: [],
@@ -200,32 +175,31 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggleDebug = useCallback(() => {
-    setState(prev => {
-      const newState = {
-        ...prev,
-        debugMode: !prev.debugMode
-      };
-      console.log("Debug mode toggled:", newState.debugMode);
-      return newState;
-    });
+    setState(prev => ({
+      ...prev,
+      debugMode: !prev.debugMode
+    }));
   }, []);
 
   const solve = useCallback(async () => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Simple state with just ranks (card values)
-    type Pile = number[];
-    type State = Pile[];
-    type Move = { from: number, to: number };
+    // Convert GamePile[] to simple number[][]
+    const initialState = state.piles.map(pile => pile.cards.map(card => card.value));
+    console.log("Initial state:", initialState);
+
+    type State = number[][];
+    type Move = { from: number; to: number };
 
     function isGoal(state: State): boolean {
       let completePiles = 0;
       for (const pile of state) {
         if (pile.length === 0) continue;
         if (pile.length !== 4) return false;
-        if (!pile.every(r => r === pile[0])) return false;
+        if (!pile.every(v => v === pile[0])) return false;
         completePiles++;
       }
+      console.log("Complete piles:", completePiles);
       return completePiles === 13;
     }
 
@@ -237,67 +211,83 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
         for (let j = 0; j < state.length; j++) {
           if (i === j) continue;
+
+          // Can move to empty pile
           if (state[j].length === 0) {
             moves.push({ from: i, to: j });
-          } else {
-            const top = state[j][state[j].length - 1];
-            if (top === card && state[j].length < 4) {
+          } else if (state[j].length < 4) {
+            // Can move to pile with matching value and room
+            const topCard = state[j][state[j].length - 1];
+            if (topCard === card) {
               moves.push({ from: i, to: j });
             }
           }
         }
       }
+      console.log("Found valid moves:", moves.length);
       return moves;
     }
 
-    function applyMove(state: State, move: Move): State {
-      const newState = state.map(pile => [...pile]);
-      const card = newState[move.from].pop()!;
-      newState[move.to].push(card);
-      return newState;
-    }
-
     function stateToString(state: State): string {
-      return state.map(pile => pile.map(r => r.toString()).join(",")).join("|");
+      return state.map(pile => 
+        pile.length === 0 ? "-" : pile.join(",")
+      ).join("|");
     }
 
-    async function findSolution(
+    async function solve(
       state: State,
       visited = new Set<string>(),
       path: Move[] = []
     ): Promise<Move[] | null> {
-      if (isGoal(state)) return path;
+      if (path.length % 10 === 0) {
+        console.log("Search depth:", path.length, "Visited states:", visited.size);
+      }
 
-      const key = stateToString(state);
-      if (visited.has(key)) return null;
-      visited.add(key);
+      if (isGoal(state)) {
+        console.log("Found solution!");
+        return path;
+      }
 
-      for (const move of getValidMoves(state)) {
-        const nextState = applyMove(state, move);
-        const result = await findSolution(nextState, visited, [...path, move]);
-        if (result) return result;
-        await sleep(1); // Prevent UI freeze
+      const stateKey = stateToString(state);
+      if (visited.has(stateKey)) {
+        return null;
+      }
+      visited.add(stateKey);
+
+      const moves = getValidMoves(state);
+      for (const move of moves) {
+        // Create new state after move
+        const newState = state.map(pile => [...pile]);
+        const card = newState[move.from].pop()!;
+        newState[move.to].push(card);
+
+        // Try this move
+        const result = await solve(newState, visited, [...path, move]);
+        if (result !== null) {
+          return result;
+        }
+
+        // Prevent browser from freezing
+        if (path.length % 100 === 0) {
+          await sleep(0);
+        }
       }
 
       return null;
     }
 
-    // Convert game state to simple state
-    const simpleState: State = state.piles.map(pile =>
-      pile.cards.map(card => card.value)
-    );
-
-    console.log("Starting solve with state:", simpleState);
-    const solution = await findSolution(simpleState);
+    console.log("Starting solve...");
+    const solution = await solve(initialState);
 
     if (solution) {
       console.log("Solution found:", solution);
+      // Execute the moves
       for (const move of solution) {
         if (validateMove(move.from, move.to)) {
           makeMove(move.from);
-          await sleep(300); // Animation delay
+          await sleep(300);
         } else {
-          console.log("Invalid move found in solution:", move);
+          console.log("Invalid move:", move);
           break;
         }
       }
