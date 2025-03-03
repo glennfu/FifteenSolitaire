@@ -6,8 +6,12 @@ export function Board() {
 
   return (
     <div 
-      className="w-full max-w-3xl mx-auto grid grid-cols-5 grid-rows-3 gap-2 place-items-center" 
-      style={{ userSelect: "none" }}
+      className="w-full max-w-3xl mx-auto grid grid-cols-5 grid-rows-3 gap-2" 
+      style={{ 
+        userSelect: "none",
+        // Each pile needs about 8rem height (considering card height + stacking)
+        gridTemplateRows: "8rem 8rem 8rem"
+      }}
     >
       {/* First row - 5 piles */}
       {state.piles.slice(0, 5).map((pile) => (

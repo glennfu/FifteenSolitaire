@@ -15,7 +15,7 @@ export function Pile({ pile, onCardClick, className, disabled }: PileProps) {
   return (
     <div 
       className={cn(
-        "relative w-[4.5rem] h-[8rem]",
+        "relative w-[4.5rem] h-[6rem]",
         pile.isEmpty && "border-2 border-dashed border-gray-300 rounded-lg",
         className
       )}
@@ -29,7 +29,7 @@ export function Pile({ pile, onCardClick, className, disabled }: PileProps) {
             "transition-transform"
           )}
           style={{
-            transform: `translateY(${index * 31}px)`
+            transform: `translateY(${index * 25}px)`
           }}
         >
           <Card
