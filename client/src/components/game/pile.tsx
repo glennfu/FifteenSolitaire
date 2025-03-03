@@ -22,32 +22,23 @@ export function Pile({ pile, onCardClick, className, disabled }: PileProps) {
         className
       )}
     >
-      <AnimatePresence mode="popLayout">
+      <AnimatePresence initial={false}>
         {pile.cards.map((card, index) => (
           <motion.div
             key={card.id}
-            initial={{ scale: 0.8, y: -50, opacity: 0 }}
-            animate={{ 
-              scale: 1,
-              y: index * 25,
-              opacity: 1,
-              zIndex: index
-            }}
-            exit={{ 
-              scale: 0.8,
-              y: 50,
-              opacity: 0,
-            }}
-            transition={{ 
-              type: "spring",
-              stiffness: 500,
-              damping: 25,
-              mass: 0.5
-            }}
             layout
+            initial={false}
+            animate={{
+              y: index * 25,
+              transition: {
+                duration: 0.3,
+                ease: "linear"
+              }
+            }}
             className="absolute w-full"
             style={{
               position: index === pile.cards.length - 1 ? "relative" : "absolute",
+              zIndex: index,
             }}
           >
             <Card
