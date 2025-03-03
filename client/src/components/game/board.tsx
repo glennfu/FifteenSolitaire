@@ -6,7 +6,7 @@ export function Board() {
 
   return (
     <div 
-      className="grid grid-cols-5 gap-y-2 gap-x-2 justify-items-center" 
+      className="grid grid-cols-5 gap-y-8 gap-x-2 justify-items-center h-[700px]" 
       style={{ userSelect: "none" }}
     >
       {/* First row - 5 piles */}
