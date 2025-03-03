@@ -3,12 +3,11 @@
 @tailwind utilities;
 
 @layer base {
+  * {
+    @apply border-border select-none;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
-}
-
-/* Make cards and interactive elements unselectable, but keep text selectable by default */
-.card-unselectable {
-  @apply select-none;
 }

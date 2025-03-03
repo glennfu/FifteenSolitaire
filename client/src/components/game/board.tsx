@@ -6,8 +6,9 @@ export function Board() {
 
   return (
     <div 
-      className="w-full max-w-3xl mx-auto grid grid-cols-5 gap-2 card-unselectable" 
+      className="w-full max-w-3xl mx-auto grid grid-cols-5 gap-2" 
       style={{ 
+        userSelect: "none",
         height: "calc(100vh - 6rem)", // Account for footer height + padding
         gridTemplateRows: "1fr 1fr 1fr",
       }}

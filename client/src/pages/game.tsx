@@ -24,6 +24,7 @@ export default function Game() {
     }
   }, [loadGame, initGame]);
 
+  // Show win dialog when game is won
   useEffect(() => {
     if (state.gameWon && !showWinDialog) {
       setShowWinDialog(true);
@@ -39,26 +40,16 @@ export default function Game() {
     initGame();
   }, [initGame]);
 
-  console.log("Debug mode:", state.debugMode); // Debug log - added from original code
-
-
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
-      {/* Game board */}
-      <div className="flex-1 overflow-y-auto p-4">
+    <div className="fixed inset-0 bg-background">
+      <div className="h-[calc(100vh-4rem)] flex items-start justify-center p-4">
         <Board />
       </div>
 
-      {/* Debug panel - positioned below board but above footer */}
-      {state.debugMode && (
-        <div className="overflow-y-auto p-4" style={{ maxHeight: '30vh' }}>
-          <DebugPanel />
-        </div>
-      )}
+      {state.debugMode && <DebugPanel />}
 
-      {/* Footer - always at bottom */}
-      <div className="border-t bg-background p-4">
-        <div className="max-w-3xl mx-auto flex justify-between items-center">
+      <div className="fixed bottom-0 left-0 right-0 p-4">
+        <div className="flex justify-between items-center">
           <Menu />
           <div>
             <h1 className="text-2xl font-bold text-center">Fifteen</h1>

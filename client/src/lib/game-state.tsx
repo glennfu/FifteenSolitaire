@@ -4,7 +4,7 @@ import {
   Card,
   CardSuit,
   CardValue,
-  GamePile
+  gameStateSchema
 } from "@shared/schema";
 
 interface GameContextType {
@@ -43,12 +43,75 @@ function shuffleDeck(): Card[] {
   return deck;
 }
 
+interface GamePile {
+  id: number;
+  cards: Card[];
+  isEmpty: boolean;
+}
+
+interface GameState {
+  piles: GamePile[];
+  moveHistory: {
+    fromPile: number;
+    toPile: number;
+    card: Card;
+  }[];
+  gamesWon: number;
+  debugMode: boolean;
+  gameWon: boolean;
+}
+
+
+function isGoalState(piles: GamePile[]): boolean {
+  return piles.every(pile => 
+    pile.cards.length === 0 || 
+    (pile.cards.length === 4 && pile.cards.every(card => card.value === pile.cards[0].value))
+  );
+}
+
+function getValidMoves(piles: GamePile[]): {fromPile: number, toPile: number}[] {
+  const moves: {fromPile: number, toPile: number}[] = [];
+
+  for (let fromPile = 0; fromPile < piles.length; fromPile++) {
+    if (piles[fromPile].cards.length === 0) continue;
+
+    const sourceCard = piles[fromPile].cards[piles[fromPile].cards.length - 1];
+
+    for (let toPile = 0; toPile < piles.length; toPile++) {
+      if (fromPile === toPile) continue;
+
+      // Can always move to empty pile
+      if (piles[toPile].cards.length === 0) {
+        moves.push({ fromPile, toPile });
+        continue;
+      }
+
+      // Can only stack on matching values when pile isn't full
+      const targetPile = piles[toPile];
+      const targetCard = targetPile.cards[targetPile.cards.length - 1];
+
+      if (targetCard.value === sourceCard.value && targetPile.cards.length < 4) {
+        moves.push({ fromPile, toPile });
+      }
+    }
+  }
+
+  return moves;
+}
+
+function pileStateToString(piles: GamePile[]): string {
+  return piles
+    .map(pile => pile.cards.map(card => `${card.value}-${card.suit}`).join(","))
+    .join("|");
+}
+
 export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GameState>({
     piles: [],
     moveHistory: [],
     gamesWon: 0,
-    debugMode: false
+    debugMode: false,
+    gameWon: false
   });
 
   const initGame = useCallback(() => {
@@ -56,10 +119,10 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     const piles = Array(15).fill(null).map((_, index) => ({
       id: index,
       cards: [],
-      isEmpty: index === 5 || index === 9 // Keep piles 5 and 9 empty
+      isEmpty: (index + 1) === 6 || (index + 1) === 10
     }));
 
-    // Distribute cards only to non-empty piles
+    // Distribute cards to non-empty piles
     let cardIndex = 0;
     piles.forEach((pile) => {
       if (!pile.isEmpty) {
@@ -71,93 +134,74 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     setState(prev => ({
       ...prev,
       piles,
-      moveHistory: []
+      moveHistory: [],
+      gameWon: false
     }));
   }, []);
 
   const validateMove = useCallback((fromPile: number, toPile: number): boolean => {
     const sourcePile = state.piles[fromPile];
     const targetPile = state.piles[toPile];
-
+    
     if (!sourcePile || !targetPile) return false;
     if (sourcePile.cards.length === 0) return false;
-
+    
     const movingCard = sourcePile.cards[sourcePile.cards.length - 1];
-
-    // Check if move is to empty pile
-    if (targetPile.cards.length === 0) {
-      // Allow moves to empty piles if:
-      // 1. It's one of the initially empty piles (5 or 9), or
-      // 2. There are matching cards elsewhere
-      const isInitiallyEmptyPile = targetPile.isEmpty;
-      const hasMatches = state.piles.some((pile, i) =>
-        i !== fromPile && i !== toPile &&
-        pile.cards.length > 0 &&
-        pile.cards[pile.cards.length - 1].value === movingCard.value
-      );
-      return isInitiallyEmptyPile || hasMatches;
-    }
-
-    // Check if move is stacking on matching value
+    
+    // Can always move to empty pile
+    if (targetPile.cards.length === 0) return true;
+    
+    // Can stack on matching values when pile isn't full
     const topCard = targetPile.cards[targetPile.cards.length - 1];
     return topCard.value === movingCard.value && targetPile.cards.length < 4;
   }, [state.piles]);
 
-  const makeMove = useCallback((fromPile: number) => {
+  const makeMove = useCallback((pileId: number) => {
     setState(prev => {
-      const sourcePile = prev.piles[fromPile];
-      if (!sourcePile || sourcePile.cards.length === 0) return prev;
+      // Find first valid move for the selected pile
+      const fromPile = prev.piles[pileId];
+      if (!fromPile || fromPile.cards.length === 0) return prev;
 
-      // Find all valid target piles
-      const validTargets = prev.piles
-        .map((_, index) => index)
-        .filter(index => index !== fromPile && validateMove(fromPile, index));
+      const validMove = prev.piles.findIndex((pile, index) => 
+        index !== pileId && validateMove(pileId, index)
+      );
 
-      if (validTargets.length === 0) return prev;
-
-      // Prioritize moves that complete sets
-      const targetPileIndex = validTargets.reduce((best, current) => {
-        const currentPile = prev.piles[current];
-        const bestPile = prev.piles[best];
-        // Prefer piles that would be completed (have 3 cards)
-        if (currentPile.cards.length === 3 && bestPile.cards.length !== 3) return current;
-        if (bestPile.cards.length === 3 && currentPile.cards.length !== 3) return best;
-        // Otherwise prefer piles with more matching cards
-        return current;
-      }, validTargets[0]);
+      if (validMove === -1) return prev;
 
       const newPiles = [...prev.piles];
-      const movingCard = sourcePile.cards[sourcePile.cards.length - 1];
+      const movingCard = fromPile.cards[fromPile.cards.length - 1];
 
-      // Update source pile
-      newPiles[fromPile] = {
-        ...sourcePile,
-        cards: sourcePile.cards.slice(0, -1),
-        isEmpty: sourcePile.isEmpty // Keep original isEmpty state
+      // Remove card from source pile
+      newPiles[pileId] = {
+        ...fromPile,
+        cards: fromPile.cards.slice(0, -1)
       };
 
-      // Update target pile
-      newPiles[targetPileIndex] = {
-        ...newPiles[targetPileIndex],
-        cards: [...newPiles[targetPileIndex].cards, movingCard],
-        isEmpty: false // Keep original isEmpty state
+      // Add card to target pile
+      newPiles[validMove] = {
+        ...newPiles[validMove],
+        cards: [...newPiles[validMove].cards, movingCard]
       };
 
-      // Check for win condition
-      const hasWon = newPiles.every(pile =>
-        pile.cards.length === 0 ||
+      // Record move in history
+      const newHistory = [...prev.moveHistory, {
+        fromPile: pileId,
+        toPile: validMove,
+        card: movingCard
+      }];
+
+      // Check win condition
+      const hasWon = newPiles.every(pile => 
+        pile.cards.length === 0 || 
         (pile.cards.length === 4 && pile.cards.every(card => card.value === pile.cards[0].value))
       );
 
       return {
         ...prev,
         piles: newPiles,
-        moveHistory: [...prev.moveHistory, {
-          fromPile,
-          toPile: targetPileIndex,
-          card: movingCard
-        }],
-        gamesWon: hasWon ? prev.gamesWon + 1 : prev.gamesWon
+        moveHistory: newHistory,
+        gamesWon: hasWon ? prev.gamesWon + 1 : prev.gamesWon,
+        gameWon: hasWon
       };
     });
   }, [validateMove]);
@@ -165,24 +209,22 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const undo = useCallback(() => {
     setState(prev => {
       if (prev.moveHistory.length === 0) return prev;
-
+      
       const lastMove = prev.moveHistory[prev.moveHistory.length - 1];
       const newPiles = [...prev.piles];
-
+      
       // Remove card from target pile
       newPiles[lastMove.toPile] = {
         ...newPiles[lastMove.toPile],
-        cards: newPiles[lastMove.toPile].cards.slice(0, -1),
-        isEmpty: newPiles[lastMove.toPile].cards.length === 1
+        cards: newPiles[lastMove.toPile].cards.slice(0, -1)
       };
-
+      
       // Add card back to source pile
       newPiles[lastMove.fromPile] = {
         ...newPiles[lastMove.fromPile],
-        cards: [...newPiles[lastMove.fromPile].cards, lastMove.card],
-        isEmpty: false
+        cards: [...newPiles[lastMove.fromPile].cards, lastMove.card]
       };
-
+      
       return {
         ...prev,
         piles: newPiles,
@@ -192,7 +234,12 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadGame = useCallback((savedState: GameState) => {
-    setState(savedState);
+    const parsed = gameStateSchema.safeParse(savedState);
+    if (parsed.success) {
+      setState(parsed.data);
+    } else {
+      throw new Error("Invalid game state");
+    }
   }, []);
 
   const toggleDebug = useCallback(() => {
@@ -205,188 +252,57 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const solve = useCallback(async () => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Simple state with just card values (ranks)
-    type State = number[][];
-    type Move = { from: number, to: number };
-
-    function toSimpleState(): State {
-      return state.piles.map(pile => pile.cards.map(card => card.value));
-    }
-
-    function getCompleteSets(state: State): number {
-      return state.filter(pile =>
-        pile.length === 4 && pile.every(v => v === pile[0])
-      ).length;
-    }
-
-    function logMove(state: State, move: Move) {
-      const fromPile = state[move.from];
-      const toPile = state[move.to];
-      const movingCard = fromPile[fromPile.length - 1];
-      const toCard = toPile.length > 0 ? toPile[toPile.length - 1] : null;
-      console.log(
-        `Moving ${movingCard} from pile ${move.from} (${fromPile.join(',')}) ` +
-        `to pile ${move.to} (${toPile.length > 0 ? toPile.join(',') : 'empty'})`
-      );
-    }
-
-    function stateToString(state: State): string {
-      // Sort piles by content to detect equivalent states
-      return state
-        .map(pile => pile.length === 0 ? '-' : [...pile].sort((a, b) => a - b).join(','))
-        .sort()
-        .join('|');
-    }
-
-    function getValidMoves(state: State): Move[] {
-      const moves: Move[] = [];
-      const completedRanks = new Set<number>();
-
-      // First identify completed ranks
-      state.forEach(pile => {
-        if (pile.length === 4 && pile.every(v => v === pile[0])) {
-          completedRanks.add(pile[0]);
-        }
-      });
-
-      // Find and sort moves by priority
-      const prioritizedMoves: Move[] = [];
-      const otherMoves: Move[] = [];
-
-      for (let from = 0; from < state.length; from++) {
-        if (state[from].length === 0) continue;
-        const card = state[from][state[from].length - 1];
-
-        // Skip moving cards that are part of completed ranks
-        if (completedRanks.has(card)) continue;
-
-        for (let to = 0; to < state.length; to++) {
-          if (from === to) continue;
-
-          // Skip if the move wouldn't be valid in the game
-          if (!validateMove(from, to)) continue;
-
-          if (state[to].length === 0) {
-            // For empty piles, verify there are other matching cards
-            const hasMatches = state.some((pile, i) =>
-              i !== from && i !== to &&
-              pile.length > 0 &&
-              pile[pile.length - 1] === card
-            );
-            if (hasMatches) {
-              otherMoves.push({ from, to });
-            }
-          } else if (state[to].length < 4) {
-            const topCard = state[to][state[to].length - 1];
-            if (topCard === card) {
-              // Prioritize moves that build/complete sets
-              if (state[to].length === 3) {
-                prioritizedMoves.unshift({ from, to });
-              } else {
-                prioritizedMoves.push({ from, to });
-              }
-            }
-          }
-        }
-      }
-
-      return [...prioritizedMoves, ...otherMoves];
-    }
-
-    function applyMove(state: State, move: Move): State {
-      const newState = state.map(pile => [...pile]);
-      const card = newState[move.from].pop()!;
-      newState[move.to].push(card);
-      return newState;
-    }
-
-    async function dfs(
-      state: State,
-      path: Move[] = [],
+    async function findSolution(
+      currentPiles: GamePile[],
       visited = new Set<string>(),
-      depth = 0
-    ): Promise<Move[] | null> {
-      if (depth % 10 === 0) {
-        console.log(`\nDepth ${depth}:`);
-        console.log(`Complete sets: ${getCompleteSets(state)}`);
-        console.log(`Visited states: ${visited.size}`);
-        await sleep(0);
-      }
+      path: {fromPile: number, toPile: number}[] = []
+    ): Promise<{fromPile: number, toPile: number}[] | null> {
+      if (isGoalState(currentPiles)) return path;
 
-      // Check for solution
-      const completeSets = getCompleteSets(state);
-      if (completeSets === 13) {
-        console.log("\nFound winning state!");
-        return path;
-      }
-
-      // Get state signature and check for cycles
-      const stateKey = stateToString(state);
+      const stateKey = pileStateToString(currentPiles);
       if (visited.has(stateKey)) return null;
       visited.add(stateKey);
 
-      // Get valid moves
-      const moves = getValidMoves(state);
+      const validMoves = getValidMoves(currentPiles);
 
-      // Try each move
-      for (const move of moves) {
-        // Log move details
-        if (depth % 10 === 0) {
-          logMove(state, move);
-        }
+      for (const move of validMoves) {
+        // Deep clone the current state
+        const nextPiles = currentPiles.map(pile => ({
+          ...pile,
+          cards: [...pile.cards]
+        }));
 
-        const nextState = applyMove(state, move);
-        const nextSets = getCompleteSets(nextState);
+        // Apply the move
+        const movingCard = nextPiles[move.fromPile].cards.pop()!;
+        nextPiles[move.toPile].cards.push(movingCard);
 
-        // Log when we complete a new set
-        if (nextSets > completeSets) {
-          console.log(`\nCompleted new set at depth ${depth}:`);
-          logMove(state, move);
-        }
-
-        // Try this move
-        const result = await dfs(nextState, [...path, move], visited, depth + 1);
+        const result = await findSolution(nextPiles, visited, [...path, move]);
         if (result) return result;
+
+        await sleep(50); // Small delay to prevent blocking
       }
 
       return null;
     }
 
-    // Start solving
-    console.log("\nStarting solve...");
-    const initialState = toSimpleState();
-    console.log("initial_state = [");
-    initialState.forEach((pile, index) => {
-      const pileStr = pile.length === 0 ? '    []' : `    [${pile.join(', ')}]`;
-      console.log(index === initialState.length - 1 ? `${pileStr}` : `${pileStr},`);
-    });
-    console.log("]");
+    // Start the solving process
+    const solution = await findSolution(state.piles);
+    if (!solution) return;
 
-    const solution = await dfs(initialState);
-
-    if (solution) {
-      console.log(`\nFound solution with ${solution.length} moves!`);
-      for (const move of solution) {
-        logMove(initialState, move);
-        if (validateMove(move.from, move.to)) {
-          makeMove(move.from);
-          await sleep(300);
-        } else {
-          console.error("Invalid move in solution:", move);
-          return;
-        }
-      }
-    } else {
-      console.log("\nNo solution found");
+    // Execute the solution moves with animation delays
+    for (const move of solution) {
+      makeMove(move.fromPile);
+      await sleep(300); // Match animation duration
     }
-  }, [state.piles, makeMove, validateMove]);
+  }, [state.piles, makeMove]);
 
+  // Save state to localStorage whenever it changes
   useCallback(() => {
     localStorage.setItem("gameState", JSON.stringify(state));
   }, [state]);
 
   return (
-    <GameContext.Provider
+    <GameContext.Provider 
       value={{
         state,
         makeMove,
