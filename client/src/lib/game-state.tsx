@@ -198,7 +198,10 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       const fromCard = fromPile[fromPile.length - 1];
 
       // Can move to empty pile
-      if (toPile.length === 0) return true;
+      if (toPile.length === 0) {
+        // Only if there are matching cards elsewhere
+        return true;
+      }
 
       // Can only stack on matching rank if pile isn't full
       if (toPile.length >= 4) return false;
@@ -211,23 +214,27 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
       for (let from = 0; from < state.length; from++) {
         if (state[from].length === 0) continue;
+        const sourceCard = state[from][state[from].length - 1];
 
         for (let to = 0; to < state.length; to++) {
           if (from === to) continue;
 
-          if (canMove(state[from], state[to])) {
-            // For empty pile moves, verify there are matching cards elsewhere
-            if (state[to].length === 0) {
-              const sourceCard = state[from][state[from].length - 1];
-              const hasMatches = state.some((pile, i) =>
-                i !== from && i !== to &&
-                pile.length > 0 &&
-                pile[pile.length - 1].rank === sourceCard.rank
-              );
-              if (hasMatches) {
-                moves.push({ from, to });
-              }
-            } else {
+          // First verify move with game rules
+          if (!validateMove(from, to)) continue;
+
+          if (state[to].length === 0) {
+            // Only move to empty pile if we have matching cards elsewhere
+            const hasMatches = state.some((pile, i) =>
+              i !== from && i !== to &&
+              pile.length > 0 &&
+              pile[pile.length - 1].rank === sourceCard.rank
+            );
+            if (hasMatches) {
+              moves.push({ from, to });
+            }
+          } else if (state[to].length < 4) {
+            const targetCard = state[to][state[to].length - 1];
+            if (targetCard.rank === sourceCard.rank) {
               moves.push({ from, to });
             }
           }
@@ -258,10 +265,9 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     function stateToString(state: State): string {
       // Sort piles and cards within piles for consistent comparison
       return state
-        .map(pile => pile.length === 0 ? '-' : [...pile]
-          .map(c => c.rank)
-          .sort((a, b) => a - b)
-          .join(',')
+        .map(pile =>
+          pile.length === 0 ? '-' :
+            [...pile].map(c => c.rank).sort((a, b) => a - b).join(',')
         )
         .sort()
         .join('|');
@@ -302,19 +308,23 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
         // Execute each move with proper validation and delay
         for (const move of current.path) {
-          // Log the move details
+          // Debug output for move
           const fromPile = current.state[move.from];
           const movingCard = fromPile[fromPile.length - 1];
           console.log(`Moving ${movingCard.rank} from pile ${move.from} to ${move.to}`);
 
-          // Validate and execute the move
-          if (validateMove(move.from, move.to)) {
-            makeMove(move.from);
-            await sleep(300); // Animation delay
-          } else {
+          // Double check move validity
+          if (!validateMove(move.from, move.to)) {
             console.error(`Invalid move detected: ${move.from} -> ${move.to}`);
+            console.error('State at invalid move:', current.state.map((pile, i) => 
+              `Pile ${i}: ${pile.map(c => c.rank).join(',')}`
+            ));
             return;
           }
+
+          // Execute move
+          makeMove(move.from);
+          await sleep(300); // Animation delay
         }
         return;
       }
@@ -333,6 +343,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       const sortedMoves = moves.sort((a, b) => {
         const stateA = applyMove(current.state, a);
         const stateB = applyMove(current.state, b);
+        // Prioritize moves that complete sets
         const completeA = stateA[a.to].length === 4;
         const completeB = stateB[b.to].length === 4;
         return Number(completeB) - Number(completeA);
@@ -349,7 +360,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
     console.log(`Search terminated after ${iterations} iterations`);
     console.log("No solution found");
-  }, [state.piles, makeMove, validateMove]);
+  }, [state, makeMove, validateMove]);
 
   // Save state to localStorage whenever it changes
   useCallback(() => {
