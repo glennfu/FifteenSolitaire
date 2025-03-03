@@ -27,7 +27,7 @@ export default function Game() {
   }, [undo]);
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col bg-background p-4">
+    <div className="fixed inset-0 flex flex-col bg-background p-4">
       <div className="flex justify-between items-center mb-4">
         <Button 
           variant="ghost" 
@@ -46,8 +46,8 @@ export default function Game() {
         <Menu />
       </div>
 
-      <div className="flex-1 flex items-center justify-center">
-        <div className="w-full max-w-3xl">
+      <div className="flex-1 flex items-center justify-center overflow-hidden">
+        <div className="w-full">
           <Board />
         </div>
       </div>
