@@ -48,8 +48,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     piles: [],
     moveHistory: [],
     gamesWon: 0,
-    debugMode: false,
-    gameWon: false
+    debugMode: false
   });
 
   const initGame = useCallback(() => {
@@ -72,8 +71,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     setState(prev => ({
       ...prev,
       piles,
-      moveHistory: [],
-      gameWon: false
+      moveHistory: []
     }));
   }, []);
 
@@ -137,11 +135,10 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         piles: newPiles,
         moveHistory: newHistory,
-        gamesWon: hasWon ? prev.gamesWon + 1 : prev.gamesWon,
-        gameWon: hasWon
+        gamesWon: hasWon ? prev.gamesWon + 1 : prev.gamesWon
       };
     });
-  }, [validateMove]);
+  }, []);
 
   const undo = useCallback(() => {
     setState(prev => {
@@ -184,128 +181,173 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const solve = useCallback(async () => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Simple state with just values to match the example algorithm
-    type Pile = number[];
-    type State = Pile[];
+    // Convert piles to a simplified state
+    type SimplePile = {
+      cards: number[],  // Just the values
+      completable: boolean  // Can this pile be completed with cards elsewhere?
+    };
+    type SimpleState = SimplePile[];
+
+    function getSimpleState(): SimpleState {
+      return state.piles.map(pile => {
+        const values = pile.cards.map(card => card.value);
+        // Check if this pile can be completed
+        const topValue = values.length > 0 ? values[values.length - 1] : null;
+        const completable = topValue !== null && state.piles.some((otherPile, i) =>
+          pile.id !== i && otherPile.cards.some(card => card.value === topValue)
+        );
+        return { cards: values, completable };
+      });
+    }
+
+    function stateToString(piles: SimpleState): string {
+      // Sort each pile's cards and then sort piles themselves
+      return piles
+        .map(pile => ({
+          ...pile,
+          cards: [...pile.cards].sort((a, b) => a - b)
+        }))
+        .sort((a, b) => {
+          if (a.cards.length === 0) return 1;
+          if (b.cards.length === 0) return -1;
+          return a.cards[0] - b.cards[0];
+        })
+        .map(pile => 
+          pile.cards.length === 0 ? '-' : pile.cards.join(',')
+        )
+        .join('|');
+    }
+
+    function evaluateState(state: SimpleState): number {
+      let score = 0;
+      for (const pile of state) {
+        if (pile.cards.length === 4 && 
+            pile.cards.every(v => v === pile.cards[0])) {
+          score += 100;  // Complete set
+        } else if (pile.cards.length > 0) {
+          const matches = pile.cards.filter(v => v === pile.cards[0]).length;
+          score += matches * 10;  // Partial sets
+        }
+      }
+      return score;
+    }
+
     type Move = { from: number, to: number };
 
-    function toSimpleState(piles: GamePile[]): State {
-      return piles.map(pile => pile.cards.map(card => card.value));
-    }
-
-    function isGoal(state: State): boolean {
-      let completePiles = 0;
-      for (const pile of state) {
-        if (pile.length === 0) continue;
-        if (pile.length !== 4) return false;
-        if (!pile.every(v => v === pile[0])) return false;
-        completePiles++;
-      }
-      return completePiles === 13;
-    }
-
-    function getValidMoves(state: State): Move[] {
+    function getValidMoves(state: SimpleState): Move[] {
       const moves: Move[] = [];
-      for (let i = 0; i < state.length; i++) {
-        if (state[i].length === 0) continue;
-        const card = state[i][state[i].length - 1];
+      for (let from = 0; from < state.length; from++) {
+        if (state[from].cards.length === 0) continue;
+        const card = state[from].cards[state[from].cards.length - 1];
 
-        for (let j = 0; j < state.length; j++) {
-          if (i === j) continue;
+        for (let to = 0; to < state.length; to++) {
+          if (from === to) continue;
 
-          // Can move to empty pile
-          if (state[j].length === 0) {
-            moves.push({ from: i, to: j });
-            continue;
-          }
+          // Verify move with game rules
+          if (!validateMove(from, to)) continue;
 
-          // Can stack on matching values when pile isn't full
-          const top = state[j][state[j].length - 1];
-          if (top === card && state[j].length < 4) {
-            moves.push({ from: i, to: j });
+          // Only allow moves that make progress
+          if (state[to].cards.length === 0) {
+            // Only move to empty pile if we can complete it
+            if (state[from].completable) {
+              moves.push({ from, to });
+            }
+          } else if (state[to].cards.length < 4) {
+            const topCard = state[to].cards[state[to].cards.length - 1];
+            if (topCard === card) {
+              moves.push({ from, to });
+            }
           }
         }
       }
       return moves;
     }
 
-    function applyMove(state: State, move: Move): State {
-      const newState = state.map(pile => [...pile]);
-      const card = newState[move.from].pop()!;
-      newState[move.to].push(card);
+    function applyMove(state: SimpleState, move: Move): SimpleState {
+      const newState = state.map(pile => ({
+        ...pile,
+        cards: [...pile.cards]
+      }));
+      const card = newState[move.from].cards.pop()!;
+      newState[move.to].cards.push(card);
       return newState;
     }
 
-    function stateToString(state: State): string {
-      return state
-        .map(pile => pile.length === 0 ? '-' : pile.sort().join(','))
-        .join('|');
-    }
-
-    function solve(startState: State): Move[] | null {
-      const stack: Array<{state: State, path: Move[]}> = [{
-        state: startState,
-        path: []
-      }];
-      const visited = new Set<string>();
-
-      let iterations = 0;
-      while (stack.length > 0 && iterations < 1000000) {
-        iterations++;
-        if (iterations % 1000 === 0) {
-          console.log(`Iteration ${iterations}, Stack size: ${stack.length}, Visited states: ${visited.size}`);
-        }
-
-        const current = stack.pop()!;
-
-        if (isGoal(current.state)) {
-          console.log(`Found solution after ${iterations} iterations!`);
-          return current.path;
-        }
-
-        const stateKey = stateToString(current.state);
-        if (visited.has(stateKey)) continue;
-        visited.add(stateKey);
-
-        const moves = getValidMoves(current.state);
-        console.log(`At depth ${current.path.length}, found ${moves.length} possible moves`);
-
-        for (const move of moves) {
-          const nextState = applyMove(current.state, move);
-          stack.push({
-            state: nextState,
-            path: [...current.path, move]
-          });
+    function isWinningState(state: SimpleState): boolean {
+      let completePiles = 0;
+      for (const pile of state) {
+        if (pile.cards.length === 0) continue;
+        if (pile.cards.length === 4 && 
+            pile.cards.every(v => v === pile.cards[0])) {
+          completePiles++;
         }
       }
-
-      console.log(`Search terminated after ${iterations} iterations`);
-      return null;
+      return completePiles === 13;
     }
 
-    // Convert to simple state and solve
+    // Start solving
     console.log("Starting solve...");
-    const simpleState = toSimpleState(state.piles);
-    console.log("Initial state:", simpleState);
+    const maxDepth = 260;  // Based on 5 moves per card * 52 cards
+    const visited = new Set<string>();
+    const stack: Array<{
+      state: SimpleState,
+      moves: Move[],
+      score: number
+    }> = [{
+      state: getSimpleState(),
+      moves: [],
+      score: 0
+    }];
 
-    const solution = solve(simpleState);
+    while (stack.length > 0) {
+      // Sort stack by score to try most promising states first
+      stack.sort((a, b) => b.score - a.score);
+      const current = stack.pop()!;
 
-    if (solution) {
-      console.log("Solution found! Executing moves...");
-      for (const move of solution) {
-        if (validateMove(move.from, move.to)) {
-          console.log(`Making move from ${move.from} to ${move.to}`);
-          makeMove(move.from);
-          await sleep(300);
-        } else {
-          console.log(`Invalid move detected: ${move.from} -> ${move.to}`);
-          break;
-        }
+      if (current.moves.length > maxDepth) {
+        console.log("Exceeded max depth, backtracking...");
+        continue;
       }
-    } else {
-      console.log("No solution found");
+
+      if (isWinningState(current.state)) {
+        console.log("Found solution!");
+        // Execute the solution
+        for (const move of current.moves) {
+          if (validateMove(move.from, move.to)) {
+            makeMove(move.from);
+            await sleep(300);
+          } else {
+            console.log("Invalid move detected:", move);
+            break;
+          }
+        }
+        return;
+      }
+
+      const stateKey = stateToString(current.state);
+      if (visited.has(stateKey)) continue;
+      visited.add(stateKey);
+
+      // Get and evaluate moves
+      const moves = getValidMoves(current.state);
+      for (const move of moves) {
+        const nextState = applyMove(current.state, move);
+        const score = evaluateState(nextState);
+        stack.push({
+          state: nextState,
+          moves: [...current.moves, move],
+          score
+        });
+      }
+
+      if (stack.length % 1000 === 0) {
+        console.log(`Stack size: ${stack.length}, Visited states: ${visited.size}`);
+        await sleep(0);  // Prevent browser freeze
+      }
     }
-  }, [state.piles, makeMove, validateMove]);
+
+    console.log("No solution found");
+  }, [state, makeMove, validateMove]);
 
   // Save state to localStorage whenever it changes
   useCallback(() => {
