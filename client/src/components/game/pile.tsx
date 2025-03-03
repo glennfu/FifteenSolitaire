@@ -15,7 +15,7 @@ export function Pile({ pile, onCardClick, className, disabled }: PileProps) {
   return (
     <div 
       className={cn(
-        "relative w-16 h-24",
+        "relative w-[4.5rem] h-[8rem]",
         pile.isEmpty && "border-2 border-dashed border-gray-300 rounded-lg",
         className
       )}
@@ -26,11 +26,10 @@ export function Pile({ pile, onCardClick, className, disabled }: PileProps) {
           className={cn(
             "absolute",
             index === pile.cards.length - 1 ? "relative" : "",
-            "transition-transform",
-            index > 0 && "top-0"
+            "transition-transform"
           )}
           style={{
-            transform: `translateY(${index * 2}px)`
+            transform: `translateY(${index * 1.5}rem)`
           }}
         >
           <Card

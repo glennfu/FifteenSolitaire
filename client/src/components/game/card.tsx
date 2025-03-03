@@ -32,8 +32,8 @@ export function Card({ card, onClick, className, disabled }: CardProps) {
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-16 h-24 bg-white rounded-lg shadow-sm border-2 border-gray-200",
-        "flex flex-col items-center justify-center",
+        "w-[4.5rem] h-[6rem] bg-white rounded-lg shadow-sm border-2 border-gray-200",
+        "flex items-center justify-center gap-2 px-2",
         "transition-transform hover:scale-105 active:scale-95",
         "disabled:opacity-50 disabled:hover:scale-100",
         className
@@ -42,7 +42,7 @@ export function Card({ card, onClick, className, disabled }: CardProps) {
       <div className={cn("text-lg font-semibold", suitColor)}>
         {value}
       </div>
-      <div className={cn("text-2xl", suitColor)}>
+      <div className={cn("text-xl", suitColor)}>
         {suitSymbol}
       </div>
     </button>
