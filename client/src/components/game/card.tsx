@@ -35,7 +35,7 @@ export function Card({ card, onClick, className, disabled }: CardProps) {
         "w-[4.5rem] h-[6rem] bg-white rounded-lg shadow-md border-2 border-gray-200",
         "relative",
         "transition-transform hover:scale-105 active:scale-95",
-        "disabled:opacity-50 disabled:hover:scale-100",
+        disabled ? "opacity-75" : "opacity-100",
         className
       )}
     >

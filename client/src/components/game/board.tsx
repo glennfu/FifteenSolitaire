@@ -5,7 +5,10 @@ export function Board() {
   const { state, makeMove } = useGameState();
 
   return (
-    <div className="grid grid-cols-5 gap-8 justify-items-center">
+    <div 
+      className="grid grid-cols-5 gap-12 justify-items-center h-[700px] overflow-hidden" 
+      style={{ userSelect: "none" }}
+    >
       {/* First row - 5 piles */}
       {state.piles.slice(0, 5).map((pile) => (
         <Pile
