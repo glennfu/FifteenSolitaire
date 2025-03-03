@@ -251,16 +251,16 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const solve = useCallback(async () => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Simple state representation
-    type SimplePile = number[]; // Just card values
-    type SimpleState = SimplePile[];
+    // Convert GamePile to simple number array state
+    type Pile = number[];
+    type State = Pile[];
     type Move = { from: number, to: number };
 
-    function simplifyState(piles: GamePile[]): SimpleState {
+    function toSimpleState(piles: GamePile[]): State {
       return piles.map(pile => pile.cards.map(card => card.value));
     }
 
-    function isGoal(state: SimpleState): boolean {
+    function isGoal(state: State): boolean {
       let completePiles = 0;
       for (const pile of state) {
         if (pile.length === 0) continue;
@@ -271,14 +271,15 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       return completePiles === 13;
     }
 
-    function getValidMoves(state: SimpleState): Move[] {
+    function getValidMoves(state: State): Move[] {
       const moves: Move[] = [];
       for (let i = 0; i < state.length; i++) {
         if (state[i].length === 0) continue;
-        const card = state[i][state[i].length - 1];
 
+        const card = state[i][state[i].length - 1];
         for (let j = 0; j < state.length; j++) {
           if (i === j) continue;
+
           if (state[j].length === 0) {
             moves.push({ from: i, to: j });
           } else if (state[j].length < 4) {
@@ -292,58 +293,39 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       return moves;
     }
 
-    function applyMove(state: SimpleState, move: Move): SimpleState {
+    function applyMove(state: State, move: Move): State {
       const newState = state.map(pile => [...pile]);
       const card = newState[move.from].pop()!;
       newState[move.to].push(card);
       return newState;
     }
 
-    function stateToString(state: SimpleState): string {
-      return state.map(pile => pile.length === 0 ? '-' : pile.join(',')).join('|');
-    }
-
-    // Iterative breadth-first search
-    function solve(initialState: SimpleState): Move[] | null {
-      const queue: Array<{state: SimpleState, path: Move[]}> = [{
-        state: initialState,
-        path: []
+    function solve(startState: State): Move[] | null {
+      // Iterative DFS using a stack to prevent recursion overflow
+      const stack: Array<{state: State, moves: Move[]}> = [{
+        state: startState,
+        moves: []
       }];
       const visited = new Set<string>();
-      const maxDepth = 100; // Prevent infinite search
 
-      while (queue.length > 0) {
-        const {state, path} = queue.shift()!;
+      while (stack.length > 0) {
+        const current = stack.pop()!;
 
-        if (path.length > maxDepth) {
-          console.log("Exceeded max depth, skipping state");
-          continue;
+        if (isGoal(current.state)) {
+          return current.moves;
         }
 
-        if (isGoal(state)) {
-          console.log("Found solution with", path.length, "moves");
-          return path;
-        }
+        const key = current.state.map(pile => pile.join(',')).join('|');
+        if (visited.has(key)) continue;
+        visited.add(key);
 
-        const stateKey = stateToString(state);
-        if (visited.has(stateKey)) continue;
-        visited.add(stateKey);
-
-        // Get and prioritize moves that complete sets
-        const moves = getValidMoves(state).sort((a, b) => {
-          const stateA = applyMove(state, a);
-          const stateB = applyMove(state, b);
-          // Prioritize moves that create complete sets
-          const completeA = stateA[a.to].length === 4;
-          const completeB = stateB[b.to].length === 4;
-          return Number(completeB) - Number(completeA);
-        });
-
+        // Get valid moves and try each one
+        const moves = getValidMoves(current.state);
         for (const move of moves) {
-          const nextState = applyMove(state, move);
-          queue.push({
+          const nextState = applyMove(current.state, move);
+          stack.push({
             state: nextState,
-            path: [...path, move]
+            moves: [...current.moves, move]
           });
         }
       }
@@ -351,18 +333,19 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       return null;
     }
 
-    console.log("Starting solve...");
-    const initialState = simplifyState(state.piles);
-    console.log("Initial state:", initialState);
+    // Convert current game state to simple state
+    const simpleState = toSimpleState(state.piles);
+    console.log("Starting solve with state:", simpleState);
 
-    const solution = solve(initialState);
+    // Find solution
+    const solution = solve(simpleState);
 
     if (solution) {
       console.log("Solution found:", solution);
-      // Execute the solution with animations
+      // Execute the solution moves with animations
       for (const move of solution) {
         makeMove(move.from);
-        await sleep(300); // Animation delay
+        await sleep(300);
       }
     } else {
       console.log("No solution found");
