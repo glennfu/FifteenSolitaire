@@ -209,72 +209,42 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const solve = useCallback(async () => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Find all potential matches for each card value
-    const findPotentialMoves = () => {
-      const matches = new Map<CardValue, {
-        sourcePiles: number[],
-        targetPiles: number[]
+    // Find all cards that could form complete sets
+    const findCompletableSet = () => {
+      // Count occurrences of each card value
+      const valueCounts = new Map<CardValue, {
+        count: number,
+        piles: number[]
       }>();
 
-      // First catalog all card values and their locations
       state.piles.forEach((pile, pileIndex) => {
-        if (pile.cards.length === 0 || pile.cards.length >= 4) return;
-
+        if (pile.cards.length === 0) return;
         const topCard = pile.cards[pile.cards.length - 1];
 
-        if (!matches.has(topCard.value)) {
-          matches.set(topCard.value, {
-            sourcePiles: [],
-            targetPiles: []
-          });
+        if (!valueCounts.has(topCard.value)) {
+          valueCounts.set(topCard.value, { count: 0, piles: [] });
         }
 
-        const entry = matches.get(topCard.value)!;
-
-        // If pile has matching cards, it's a potential target
-        if (pile.cards.every(c => c.value === topCard.value)) {
-          entry.targetPiles.push(pileIndex);
-        }
-
-        // Any pile with a matching top card is a potential source
-        entry.sourcePiles.push(pileIndex);
+        const entry = valueCounts.get(topCard.value)!;
+        entry.count++;
+        entry.piles.push(pileIndex);
       });
 
-      return matches;
-    };
-
-    const findBestMove = (): { fromPile: number, toPile: number } | null => {
-      const potentialMoves = findPotentialMoves();
-
-      // First priority: Complete a pile that's already started
-      for (const [_, { sourcePiles, targetPiles }] of potentialMoves) {
-        for (const toPile of targetPiles) {
-          const targetPileCards = state.piles[toPile].cards;
-          if (targetPileCards.length >= 4) continue;
-
-          for (const fromPile of sourcePiles) {
-            if (fromPile === toPile) continue;
-            if (validateMove(fromPile, toPile)) {
-              return { fromPile, toPile };
-            }
-          }
-        }
-      }
-
-      // Second priority: Start a new group in an empty pile
-      const emptyPiles = state.piles
-        .map((pile, index) => ({ index, isEmpty: pile.cards.length === 0 }))
-        .filter(p => p.isEmpty)
-        .map(p => p.index);
-
-      if (emptyPiles.length > 0) {
-        // Look for cards that have matches elsewhere
-        for (const [_, { sourcePiles }] of potentialMoves) {
-          if (sourcePiles.length >= 2) {
-            const fromPile = sourcePiles[0];
-            const toPile = emptyPiles[0];
-            if (validateMove(fromPile, toPile)) {
-              return { fromPile, toPile };
+      // Find sets that can be completed
+      for (const [value, { count, piles }] of valueCounts.entries()) {
+        if (count >= 2) {  // Need at least 2 cards to start making progress
+          // Find if there's a pile that already has multiple matching cards
+          for (const toPile of piles) {
+            const targetPile = state.piles[toPile];
+            if (targetPile.cards.length > 1 && 
+                targetPile.cards.length < 4 && 
+                targetPile.cards.every(c => c.value === value)) {
+              // Look for a matching card we can move here
+              for (const fromPile of piles) {
+                if (fromPile !== toPile && validateMove(fromPile, toPile)) {
+                  return { fromPile, toPile };
+                }
+              }
             }
           }
         }
@@ -287,7 +257,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     const maxMoves = 50; // Prevent infinite loops
 
     while (moveCount < maxMoves && !state.gameWon) {
-      const move = findBestMove();
+      const move = findCompletableSet();
       if (!move) break;
 
       makeMove(move.fromPile);

@@ -1,7 +1,7 @@
 import { Card } from "./card";
 import { GamePile as GamePileType } from "@shared/schema";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 interface PileProps {
   pile: GamePileType;
@@ -22,33 +22,31 @@ export function Pile({ pile, onCardClick, className, disabled }: PileProps) {
         className
       )}
     >
-      <AnimatePresence initial={false}>
-        {pile.cards.map((card, index) => (
-          <motion.div
-            key={card.id}
-            layout
-            initial={false}
-            animate={{
-              y: index * 25,
-              transition: {
-                duration: 0.3,
-                ease: "linear"
-              }
-            }}
-            className="absolute w-full"
-            style={{
-              position: index === pile.cards.length - 1 ? "relative" : "absolute",
-              zIndex: index,
-            }}
-          >
-            <Card
-              card={card}
-              onClick={() => onCardClick?.(pile.id)}
-              disabled={!topCard || card.id !== topCard.id || disabled}
-            />
-          </motion.div>
-        ))}
-      </AnimatePresence>
+      {pile.cards.map((card, index) => (
+        <motion.div
+          key={card.id}
+          layout
+          initial={false}
+          animate={{
+            y: index * 25
+          }}
+          transition={{
+            duration: 0.3,
+            ease: [0.4, 0, 0.2, 1]
+          }}
+          style={{
+            position: 'absolute',
+            width: '100%',
+            zIndex: index,
+          }}
+        >
+          <Card
+            card={card}
+            onClick={() => onCardClick?.(pile.id)}
+            disabled={!topCard || card.id !== topCard.id || disabled}
+          />
+        </motion.div>
+      ))}
     </div>
   );
 }
