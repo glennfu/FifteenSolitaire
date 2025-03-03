@@ -27,14 +27,14 @@ export default function Game() {
   }, [undo]);
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-background">
-      <div className="flex-1 flex items-start justify-center p-4">
+    <div className="fixed inset-0 bg-background">
+      <div className="h-[calc(100vh-4rem)] flex items-start justify-center p-4">
         <Board />
       </div>
 
       {state.debugMode && <DebugPanel />}
 
-      <div className="p-4">
+      <div className="fixed bottom-0 left-0 right-0 p-4">
         <div className="flex justify-between items-center">
           <Menu />
           <div>

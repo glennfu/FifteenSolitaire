@@ -9,7 +9,7 @@ export function Board() {
       className="w-full max-w-3xl mx-auto grid grid-cols-5 gap-2" 
       style={{ 
         userSelect: "none",
-        height: "calc(100vh - 3.5rem)", // Reduce subtracted height since footer is smaller now
+        height: "calc(100vh - 6rem)", // Account for footer height + padding
         gridTemplateRows: "1fr 1fr 1fr",
       }}
     >
