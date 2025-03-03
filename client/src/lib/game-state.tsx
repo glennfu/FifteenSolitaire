@@ -170,8 +170,8 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       let validMoves = prev.validMoves;
       let moveIndex = 0;
 
-      // If this is a new pile selection, compute and sort valid moves
-      if (prev.selectedPile !== pileId) {
+      // If this is a new pile selection or no valid moves exist
+      if (prev.selectedPile !== pileId || validMoves.length === 0) {
         const movingCard = fromPile.cards[fromPile.cards.length - 1];
 
         // Get all possible target piles
@@ -180,6 +180,9 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
         prev.piles.forEach((pile, index) => {
           if (index === pileId) return; // Skip source pile
+
+          // Verify move is legal before adding to possible moves
+          if (!validateMove(pileId, index)) return;
 
           if (pile.cards.length === 0) {
             emptyPiles.push(index);
@@ -196,7 +199,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
           return distA - distB;
         });
 
-        // Combine moves in priority order
+        // Reset and combine moves in priority order
         validMoves = [
           ...matchingPiles.map(toPile => ({ fromPile: pileId, toPile })),
           ...emptyPiles.map(toPile => ({ fromPile: pileId, toPile }))
@@ -215,6 +218,16 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       if (validMoves.length === 0) return prev;
 
       const targetMove = validMoves[moveIndex];
+
+      // Double check move is still valid
+      if (!validateMove(targetMove.fromPile, targetMove.toPile)) {
+        return {
+          ...prev,
+          selectedPile: null,
+          validMoves: []
+        };
+      }
+
       const movingCard = fromPile.cards[fromPile.cards.length - 1];
 
       // Remove card from source pile
@@ -253,7 +266,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         validMoves: validMoves
       };
     });
-  }, []);
+  }, [validateMove]);
 
   const undo = useCallback(() => {
     setState(prev => {
