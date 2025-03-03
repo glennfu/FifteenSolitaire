@@ -28,28 +28,28 @@ export default function Game() {
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background p-4">
-      <div className="flex-1 flex items-center justify-center overflow-hidden">
-        <div className="w-full">
-          <h1 className="text-2xl font-bold text-center">Fifteen</h1>
-          <p className="text-sm text-muted-foreground text-center">
-            Games Won: {state.gamesWon}
-          </p>
-          <Board />
-        </div>
+      <div className="flex-1 flex items-center justify-center">
+        <Board />
       </div>
 
       {state.debugMode && <DebugPanel />}
 
-      <div className="flex justify-between items-center mt-4">
-        <Menu />
-        <Button 
-          variant="ghost" 
-          size="icon"
-          onClick={handleUndo}
-          disabled={state.moveHistory.length === 0}
-        >
-          <Undo2 className="h-6 w-6" />
-        </Button>
+      <div className="mt-4">
+        <h1 className="text-2xl font-bold text-center">Fifteen</h1>
+        <p className="text-sm text-muted-foreground text-center mb-4">
+          Games Won: {state.gamesWon}
+        </p>
+        <div className="flex justify-between items-center">
+          <Menu />
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={handleUndo}
+            disabled={state.moveHistory.length === 0}
+          >
+            <Undo2 className="h-6 w-6" />
+          </Button>
+        </div>
       </div>
     </div>
   );
