@@ -15,7 +15,7 @@ interface GameContextType {
   loadGame: (state: GameState) => void;
   validateMove: (fromPile: number, toPile: number) => boolean;
   toggleDebug: () => void;
-  solve: () => void;  // New solve function
+  solve: () => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -207,38 +207,72 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const solve = useCallback(async () => {
+    const executeMoveWithDelay = async (fromPile: number) => {
+      makeMove(fromPile);
+      await new Promise(resolve => setTimeout(resolve, 300)); // Animation delay
+    };
+
     setState(prev => {
-      const findNextMove = () => {
+      const findBestMove = () => {
+        // Priority 1: Complete a pile if possible
         for (let fromPile = 0; fromPile < prev.piles.length; fromPile++) {
           for (let toPile = 0; toPile < prev.piles.length; toPile++) {
-            if (fromPile !== toPile && validateMove(fromPile, toPile)) {
+            if (fromPile === toPile) continue;
+
+            const sourcePile = prev.piles[fromPile];
+            const targetPile = prev.piles[toPile];
+
+            if (sourcePile.cards.length === 0) continue;
+            if (targetPile.cards.length === 0) continue;
+
+            const movingCard = sourcePile.cards[sourcePile.cards.length - 1];
+            const topTargetCard = targetPile.cards[targetPile.cards.length - 1];
+
+            if (movingCard.value === topTargetCard.value) {
               return { fromPile, toPile };
             }
           }
         }
+
+        // Priority 2: Move to empty pile if no matching moves
+        for (let fromPile = 0; fromPile < prev.piles.length; fromPile++) {
+          for (let toPile = 0; toPile < prev.piles.length; toPile++) {
+            if (fromPile === toPile) continue;
+
+            const sourcePile = prev.piles[fromPile];
+            const targetPile = prev.piles[toPile];
+
+            if (sourcePile.cards.length === 0) continue;
+            if (targetPile.cards.length !== 0) continue;
+
+            return { fromPile, toPile };
+          }
+        }
+
         return null;
       };
 
-      const executeMove = async () => {
-        const move = findNextMove();
-        if (!move) return;
-
-        // Add delay for animation
-        await new Promise(resolve => setTimeout(resolve, 100));
-        makeMove(move.fromPile);
-      };
-
-      // Start solving process
       const solveLoop = async () => {
-        while (findNextMove()) {
-          await executeMove();
+        while (true) {
+          const move = findBestMove();
+          if (!move) break;
+
+          await executeMoveWithDelay(move.fromPile);
+
+          // Check if game is won after each move
+          const hasWon = prev.piles.every(pile => 
+            pile.cards.length === 0 || 
+            (pile.cards.length === 4 && pile.cards.every(card => card.value === pile.cards[0].value))
+          );
+
+          if (hasWon) break;
         }
       };
 
       solveLoop();
       return prev;
     });
-  }, [validateMove, makeMove]);
+  }, [makeMove]);
 
   // Save state to localStorage whenever it changes
   useCallback(() => {
@@ -255,7 +289,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         loadGame,
         validateMove,
         toggleDebug,
-        solve  // Add solve to context
+        solve
       }}
     >
       {children}

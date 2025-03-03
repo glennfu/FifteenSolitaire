@@ -27,10 +27,11 @@ export function Pile({ pile, onCardClick, className, disabled }: PileProps) {
           className={cn(
             "absolute",
             index === pile.cards.length - 1 ? "relative" : "",
-            "transition-all duration-100 ease-in-out"
+            "transition-all duration-300 ease-in-out"
           )}
           style={{
-            transform: `translateY(${index * 25}px)` 
+            transform: `translateY(${index * 25}px)`,
+            zIndex: index // Ensure proper stacking
           }}
         >
           <Card
