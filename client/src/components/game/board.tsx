@@ -9,9 +9,7 @@ export function Board() {
       className="w-full max-w-3xl mx-auto grid grid-cols-5 gap-2" 
       style={{ 
         userSelect: "none",
-        // Increase row height to accommodate stacked cards (6rem card + 2rem stacking space)
-        gridTemplateRows: "repeat(3, minmax(8rem, 1fr))",
-        paddingTop: "1rem" // Add some space from top
+        gridTemplateRows: "repeat(3, minmax(6rem, 1fr))",
       }}
     >
       {/* First row - 5 piles */}
