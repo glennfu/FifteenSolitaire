@@ -29,7 +29,7 @@ export function Pile({ pile, onCardClick, className, disabled }: PileProps) {
             "transition-transform"
           )}
           style={{
-            transform: `translateY(${index * 1.25}rem)`
+            transform: `translateY(${index * 2}rem)`
           }}
         >
           <Card
