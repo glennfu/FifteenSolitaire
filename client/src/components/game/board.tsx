@@ -9,7 +9,8 @@ export function Board() {
       className="w-full max-w-3xl mx-auto grid grid-cols-5 gap-2" 
       style={{ 
         userSelect: "none",
-        gridTemplateRows: "repeat(3, minmax(6rem, 1fr))",
+        height: "calc(100vh - 3.5rem)", // Reduce subtracted height since footer is smaller now
+        gridTemplateRows: "1fr 1fr 1fr",
       }}
     >
       {/* Add debug borders to visualize grid cells */}
