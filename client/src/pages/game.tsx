@@ -28,7 +28,20 @@ export default function Game() {
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background p-4">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex-1 flex items-center justify-center overflow-hidden">
+        <div className="w-full">
+          <h1 className="text-2xl font-bold text-center mb-4">Fifteen</h1>
+          <p className="text-sm text-muted-foreground text-center mb-8">
+            Games Won: {state.gamesWon}
+          </p>
+          <Board />
+        </div>
+      </div>
+
+      {state.debugMode && <DebugPanel />}
+
+      <div className="flex justify-between items-center mt-4">
+        <Menu />
         <Button 
           variant="ghost" 
           size="icon"
@@ -37,22 +50,7 @@ export default function Game() {
         >
           <Undo2 className="h-6 w-6" />
         </Button>
-        <div className="text-center flex-1">
-          <h1 className="text-2xl font-bold">Fifteen</h1>
-          <p className="text-sm text-muted-foreground">
-            Games Won: {state.gamesWon}
-          </p>
-        </div>
-        <Menu />
       </div>
-
-      <div className="flex-1 flex items-center justify-center overflow-hidden">
-        <div className="w-full">
-          <Board />
-        </div>
-      </div>
-
-      {state.debugMode && <DebugPanel />}
     </div>
   );
 }
