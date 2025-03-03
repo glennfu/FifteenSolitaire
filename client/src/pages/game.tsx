@@ -24,7 +24,6 @@ export default function Game() {
     }
   }, [loadGame, initGame]);
 
-  // Show win dialog when game is won
   useEffect(() => {
     if (state.gameWon && !showWinDialog) {
       setShowWinDialog(true);
@@ -41,14 +40,20 @@ export default function Game() {
   }, [initGame]);
 
   return (
-    <div className="fixed inset-0 bg-background">
-      <div className="h-[calc(100vh-4rem)] flex items-start justify-center p-4">
-        <Board />
+    <div className="fixed inset-0 bg-background overflow-auto">
+      <div className="min-h-[calc(100vh-4rem)] flex flex-col p-4">
+        <div className="flex-grow">
+          <Board />
+        </div>
+
+        {state.debugMode && (
+          <div className="mt-4 mb-16">
+            <DebugPanel />
+          </div>
+        )}
       </div>
 
-      {state.debugMode && <DebugPanel />}
-
-      <div className="fixed bottom-0 left-0 right-0 p-4">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background">
         <div className="flex justify-between items-center">
           <Menu />
           <div>

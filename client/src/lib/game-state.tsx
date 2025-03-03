@@ -252,49 +252,64 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const solve = useCallback(async () => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    async function findSolution(
-      currentPiles: GamePile[],
-      visited = new Set<string>(),
-      path: {fromPile: number, toPile: number}[] = []
-    ): Promise<{fromPile: number, toPile: number}[] | null> {
-      if (isGoalState(currentPiles)) return path;
+    // Find a valid move that progresses toward completing a set
+    const findValidMove = (): {fromPile: number, toPile: number} | null => {
+      // First try to complete existing sets
+      for (let fromPile = 0; fromPile < state.piles.length; fromPile++) {
+        const sourcePile = state.piles[fromPile];
+        if (sourcePile.cards.length === 0) continue;
 
-      const stateKey = pileStateToString(currentPiles);
-      if (visited.has(stateKey)) return null;
-      visited.add(stateKey);
+        const sourceCard = sourcePile.cards[sourcePile.cards.length - 1];
 
-      const validMoves = getValidMoves(currentPiles);
+        for (let toPile = 0; toPile < state.piles.length; toPile++) {
+          if (fromPile === toPile) continue;
 
-      for (const move of validMoves) {
-        // Deep clone the current state
-        const nextPiles = currentPiles.map(pile => ({
-          ...pile,
-          cards: [...pile.cards]
-        }));
+          const targetPile = state.piles[toPile];
+          if (targetPile.cards.length >= 4) continue;
 
-        // Apply the move
-        const movingCard = nextPiles[move.fromPile].cards.pop()!;
-        nextPiles[move.toPile].cards.push(movingCard);
+          // If target pile has matching cards, prioritize this move
+          if (targetPile.cards.length > 0 && 
+              targetPile.cards[0].value === sourceCard.value) {
+            if (validateMove(fromPile, toPile)) {
+              console.log(`Found valid move: ${fromPile} -> ${toPile}`);
+              return { fromPile, toPile };
+            }
+          }
+        }
+      }
 
-        const result = await findSolution(nextPiles, visited, [...path, move]);
-        if (result) return result;
+      // If no completion moves found, try moving to empty piles
+      for (let fromPile = 0; fromPile < state.piles.length; fromPile++) {
+        if (state.piles[fromPile].cards.length === 0) continue;
 
-        await sleep(50); // Small delay to prevent blocking
+        for (let toPile = 0; toPile < state.piles.length; toPile++) {
+          if (fromPile === toPile) continue;
+          if (state.piles[toPile].cards.length === 0) {
+            if (validateMove(fromPile, toPile)) {
+              console.log(`Found move to empty pile: ${fromPile} -> ${toPile}`);
+              return { fromPile, toPile };
+            }
+          }
+        }
       }
 
       return null;
-    }
+    };
 
-    // Start the solving process
-    const solution = await findSolution(state.piles);
-    if (!solution) return;
+    let moveCount = 0;
+    while (moveCount < 50 && !state.gameWon) {
+      const move = findValidMove();
+      if (!move) {
+        console.log('No valid moves found');
+        break;
+      }
 
-    // Execute the solution moves with animation delays
-    for (const move of solution) {
+      console.log(`Executing move ${move.fromPile} -> ${move.toPile}`);
       makeMove(move.fromPile);
-      await sleep(300); // Match animation duration
+      await sleep(300);
+      moveCount++;
     }
-  }, [state.piles, makeMove]);
+  }, [state, makeMove, validateMove]);
 
   // Save state to localStorage whenever it changes
   useCallback(() => {
