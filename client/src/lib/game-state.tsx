@@ -307,7 +307,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
     function stateToString(piles: GamePile[]): string {
       return piles
-        .map(pile => pile.cards.length === 0 ? "-" : 
+        .map(pile => pile.cards.length === 0 ? "-" :
           pile.cards.map(card => `${card.value}`).join(","))
         .join("|");
     }
@@ -315,9 +315,20 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     async function findSolution(
       currentPiles: GamePile[],
       visited = new Set<string>(),
-      path: {fromPile: number, toPile: number}[] = []
+      path: {fromPile: number, toPile: number}[] = [],
+      depth = 0
     ): Promise<{fromPile: number, toPile: number}[] | null> {
+      // Log progress every 1000 states
+      if (visited.size % 1000 === 0) {
+        console.log(`Search progress:
+          States visited: ${visited.size}
+          Current depth: ${depth}
+          Current path length: ${path.length}
+        `);
+      }
+
       if (isGoal(currentPiles)) {
+        console.log("Found solution!");
         return path;
       }
 
@@ -326,13 +337,17 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       visited.add(stateKey);
 
       const validMoves = getValidMovesForState(currentPiles);
+      console.log(`Depth ${depth}: Found ${validMoves.length} valid moves`);
 
       for (const move of validMoves) {
         const nextPiles = applyMove(currentPiles, move);
-        const solution = await findSolution(nextPiles, visited, [...path, move]);
+        console.log(`Trying move: ${move.fromPile} -> ${move.toPile}`);
 
+        const solution = await findSolution(nextPiles, visited, [...path, move], depth + 1);
         if (solution) return solution;
-        await sleep(1); // Prevent UI freeze
+
+        // Add longer sleep to prevent UI freeze and allow logs to be visible
+        await sleep(10);
       }
 
       return null;
@@ -345,11 +360,12 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       console.log("Solution found:", solution);
       // Execute the solution moves with animation delays
       for (const move of solution) {
+        console.log(`Executing move: ${move.fromPile} -> ${move.toPile}`);
         makeMove(move.fromPile);
         await sleep(300); // Animation delay
       }
     } else {
-      console.log("No solution found");
+      console.log("No solution found after searching");
     }
   }, [state.piles, makeMove]);
 
