@@ -298,10 +298,23 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
       if (isGoal(current.state)) {
         console.log(`Found solution with ${current.path.length} moves!`);
-        console.log("Solution:", current.path);
+        console.log("Executing solution moves:");
+
+        // Execute each move with proper validation and delay
         for (const move of current.path) {
-          makeMove(move.from);
-          await sleep(300);
+          // Log the move details
+          const fromPile = current.state[move.from];
+          const movingCard = fromPile[fromPile.length - 1];
+          console.log(`Moving ${movingCard.rank} from pile ${move.from} to ${move.to}`);
+
+          // Validate and execute the move
+          if (validateMove(move.from, move.to)) {
+            makeMove(move.from);
+            await sleep(300); // Animation delay
+          } else {
+            console.error(`Invalid move detected: ${move.from} -> ${move.to}`);
+            return;
+          }
         }
         return;
       }
@@ -336,7 +349,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
     console.log(`Search terminated after ${iterations} iterations`);
     console.log("No solution found");
-  }, [state.piles, makeMove]);
+  }, [state.piles, makeMove, validateMove]);
 
   // Save state to localStorage whenever it changes
   useCallback(() => {
