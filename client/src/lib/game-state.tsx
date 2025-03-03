@@ -84,16 +84,18 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
     const movingCard = sourcePile.cards[sourcePile.cards.length - 1];
 
-    // Can move to empty pile if there are matching cards elsewhere
+    // Check if move is to empty pile
     if (targetPile.cards.length === 0) {
-      return state.piles.some((pile, i) =>
+      // Only allow if there are matching cards elsewhere
+      const hasMatches = state.piles.some((pile, i) =>
         i !== fromPile && i !== toPile &&
         pile.cards.length > 0 &&
         pile.cards[pile.cards.length - 1].value === movingCard.value
       );
+      return hasMatches;
     }
 
-    // Can stack on matching values when pile isn't full
+    // Check if move is stacking on matching value
     const topCard = targetPile.cards[targetPile.cards.length - 1];
     return topCard.value === movingCard.value && targetPile.cards.length < 4;
   }, [state.piles]);
@@ -103,12 +105,23 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       const sourcePile = prev.piles[fromPile];
       if (!sourcePile || sourcePile.cards.length === 0) return prev;
 
-      // Find a valid target pile
-      const targetPileIndex = prev.piles.findIndex((pile, index) =>
-        index !== fromPile && validateMove(fromPile, index)
-      );
+      // Find all valid target piles
+      const validTargets = prev.piles
+        .map((_, index) => index)
+        .filter(index => index !== fromPile && validateMove(fromPile, index));
 
-      if (targetPileIndex === -1) return prev;
+      if (validTargets.length === 0) return prev;
+
+      // Prioritize moves that complete sets
+      const targetPileIndex = validTargets.reduce((best, current) => {
+        const currentPile = prev.piles[current];
+        const bestPile = prev.piles[best];
+        // Prefer piles that would be completed (have 3 cards)
+        if (currentPile.cards.length === 3 && bestPile.cards.length !== 3) return current;
+        if (bestPile.cards.length === 3 && currentPile.cards.length !== 3) return best;
+        // Otherwise prefer piles with more matching cards
+        return current;
+      }, validTargets[0]);
 
       const newPiles = [...prev.piles];
       const movingCard = sourcePile.cards[sourcePile.cards.length - 1];
@@ -117,7 +130,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       newPiles[fromPile] = {
         ...sourcePile,
         cards: sourcePile.cards.slice(0, -1),
-        isEmpty: false // Keep original isEmpty state
+        isEmpty: sourcePile.isEmpty // Keep original isEmpty state
       };
 
       // Update target pile
