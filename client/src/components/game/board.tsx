@@ -6,7 +6,7 @@ export function Board() {
 
   return (
     <div 
-      className="grid grid-cols-5 gap-x-2 justify-items-center h-[700px]" 
+      className="grid grid-cols-5 grid-rows-3 gap-x-2 place-items-center h-full" 
       style={{ userSelect: "none" }}
     >
       {/* First row - 5 piles */}
@@ -15,7 +15,6 @@ export function Board() {
           key={pile.id}
           pile={pile}
           onCardClick={(pileId) => makeMove(pileId)}
-          className="mt-2"
         />
       ))}
 
@@ -25,7 +24,6 @@ export function Board() {
           key={pile.id}
           pile={pile}
           onCardClick={(pileId) => makeMove(pileId)}
-          className="-mt-8"
         />
       ))}
 
@@ -35,7 +33,6 @@ export function Board() {
           key={pile.id}
           pile={pile}
           onCardClick={(pileId) => makeMove(pileId)}
-          className="-mt-14"
         />
       ))}
     </div>
