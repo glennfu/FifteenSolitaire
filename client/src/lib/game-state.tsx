@@ -199,11 +199,10 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         if (!pile.every(v => v === pile[0])) return false;
         completePiles++;
       }
-      console.log("Complete piles:", completePiles);
       return completePiles === 13;
     }
 
-    function getValidMoves(state: State): Move[] {
+    function getValidMoves(state: State, lastMove: Move | null): Move[] {
       const moves: Move[] = [];
       for (let i = 0; i < state.length; i++) {
         if (state[i].length === 0) continue;
@@ -212,35 +211,53 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         for (let j = 0; j < state.length; j++) {
           if (i === j) continue;
 
-          // Can move to empty pile
+          // Skip moves that undo the last move
+          if (lastMove && i === lastMove.to && j === lastMove.from) {
+            continue;
+          }
+
+          // Prioritize moves that complete or build sets
           if (state[j].length === 0) {
-            moves.push({ from: i, to: j });
+            // Only move to empty pile if there are matching cards elsewhere
+            const hasMatches = state.some((pile, idx) => 
+              idx !== i && idx !== j && 
+              pile.length > 0 && pile[pile.length - 1] === card
+            );
+            if (hasMatches) {
+              moves.push({ from: i, to: j });
+            }
           } else if (state[j].length < 4) {
-            // Can move to pile with matching value and room
             const topCard = state[j][state[j].length - 1];
             if (topCard === card) {
-              moves.push({ from: i, to: j });
+              // Prioritize moves that complete sets by putting them first
+              if (state[j].length === 3) {
+                moves.unshift({ from: i, to: j });
+              } else {
+                moves.push({ from: i, to: j });
+              }
             }
           }
         }
       }
-      console.log("Found valid moves:", moves.length);
       return moves;
     }
 
     function stateToString(state: State): string {
+      // Sort piles by their values to ensure equivalent states map to the same string
       return state.map(pile => 
-        pile.length === 0 ? "-" : pile.join(",")
-      ).join("|");
+        pile.length === 0 ? "-" : [...pile].sort().join(",")
+      ).sort().join("|");
     }
 
     async function solve(
       state: State,
       visited = new Set<string>(),
-      path: Move[] = []
+      path: Move[] = [],
+      lastMove: Move | null = null
     ): Promise<Move[] | null> {
-      if (path.length % 10 === 0) {
+      if (path.length % 100 === 0) {
         console.log("Search depth:", path.length, "Visited states:", visited.size);
+        await sleep(0); // Prevent browser freeze
       }
 
       if (isGoal(state)) {
@@ -254,7 +271,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       }
       visited.add(stateKey);
 
-      const moves = getValidMoves(state);
+      const moves = getValidMoves(state, lastMove);
       for (const move of moves) {
         // Create new state after move
         const newState = state.map(pile => [...pile]);
@@ -262,14 +279,9 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         newState[move.to].push(card);
 
         // Try this move
-        const result = await solve(newState, visited, [...path, move]);
+        const result = await solve(newState, visited, [...path, move], move);
         if (result !== null) {
           return result;
-        }
-
-        // Prevent browser from freezing
-        if (path.length % 100 === 0) {
-          await sleep(0);
         }
       }
 
