@@ -1,6 +1,7 @@
 import { Card } from "./card";
 import { GamePile as GamePileType } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface PileProps {
   pile: GamePileType;
@@ -21,26 +22,42 @@ export function Pile({ pile, onCardClick, className, disabled }: PileProps) {
         className
       )}
     >
-      {pile.cards.map((card, index) => (
-        <div
-          key={card.id}
-          className={cn(
-            "absolute",
-            index === pile.cards.length - 1 ? "relative" : "",
-            "transition-transform duration-300 ease-in-out"
-          )}
-          style={{
-            transform: `translateY(${index * 25}px)`,
-            zIndex: index // Ensure proper stacking
-          }}
-        >
-          <Card
-            card={card}
-            onClick={() => onCardClick?.(pile.id)}
-            disabled={!topCard || card.id !== topCard.id || disabled}
-          />
-        </div>
-      ))}
+      <AnimatePresence mode="popLayout">
+        {pile.cards.map((card, index) => (
+          <motion.div
+            key={card.id}
+            initial={{ scale: 0.8, y: -50, opacity: 0 }}
+            animate={{ 
+              scale: 1,
+              y: index * 25,
+              opacity: 1,
+              zIndex: index
+            }}
+            exit={{ 
+              scale: 0.8,
+              y: 50,
+              opacity: 0,
+            }}
+            transition={{ 
+              type: "spring",
+              stiffness: 500,
+              damping: 25,
+              mass: 0.5
+            }}
+            layout
+            className="absolute w-full"
+            style={{
+              position: index === pile.cards.length - 1 ? "relative" : "absolute",
+            }}
+          >
+            <Card
+              card={card}
+              onClick={() => onCardClick?.(pile.id)}
+              disabled={!topCard || card.id !== topCard.id || disabled}
+            />
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </div>
   );
 }

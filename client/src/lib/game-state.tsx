@@ -207,71 +207,73 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const solve = useCallback(async () => {
-    const executeMoveWithDelay = async (fromPile: number) => {
-      makeMove(fromPile);
-      await new Promise(resolve => setTimeout(resolve, 300)); // Animation delay
-    };
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    setState(prev => {
-      const findBestMove = () => {
-        // Priority 1: Complete a pile if possible
-        for (let fromPile = 0; fromPile < prev.piles.length; fromPile++) {
-          for (let toPile = 0; toPile < prev.piles.length; toPile++) {
+    // Keep track of valid destination piles for each card value
+    const findValidMoves = () => {
+      const valueMatches = new Map<CardValue, number[]>();
+
+      // First pass: Record all piles with each card value
+      state.piles.forEach((pile, pileIndex) => {
+        if (pile.cards.length > 0) {
+          const topCard = pile.cards[pile.cards.length - 1];
+          if (!valueMatches.has(topCard.value)) {
+            valueMatches.set(topCard.value, []);
+          }
+          valueMatches.get(topCard.value)!.push(pileIndex);
+        }
+      });
+
+      // Second pass: Find valid moves that progress toward completion
+      for (const [value, piles] of valueMatches) {
+        // Look for piles that have matching values but aren't full
+        for (const toPile of piles) {
+          const targetPile = state.piles[toPile];
+          if (targetPile.cards.length >= 4) continue;
+
+          // Find a card we can move here
+          for (const fromPile of piles) {
             if (fromPile === toPile) continue;
-
-            const sourcePile = prev.piles[fromPile];
-            const targetPile = prev.piles[toPile];
-
-            if (sourcePile.cards.length === 0) continue;
-            if (targetPile.cards.length >= 4) continue;
-
-            const movingCard = sourcePile.cards[sourcePile.cards.length - 1];
-
-            // If target pile has cards, match by value
-            if (targetPile.cards.length > 0) {
-              const topTargetCard = targetPile.cards[targetPile.cards.length - 1];
-              if (movingCard.value === topTargetCard.value) {
-                return { fromPile, toPile };
-              }
-            }
-            // If target pile is empty and we have matching cards elsewhere
-            else if (targetPile.cards.length === 0) {
-              // Check if there are other cards with same value
-              for (let checkPile = 0; checkPile < prev.piles.length; checkPile++) {
-                if (checkPile === fromPile || checkPile === toPile) continue;
-                const checkPileCards = prev.piles[checkPile].cards;
-                if (checkPileCards.length > 0 && 
-                    checkPileCards[checkPileCards.length - 1].value === movingCard.value) {
-                  return { fromPile, toPile };
-                }
-              }
+            if (validateMove(fromPile, toPile)) {
+              return { fromPile, toPile };
             }
           }
         }
-        return null;
-      };
+      }
 
-      const solveLoop = async () => {
-        while (true) {
-          const move = findBestMove();
-          if (!move) break;
+      // If no matching moves found, try moving to empty piles
+      const emptyPiles = state.piles
+        .map((pile, index) => ({ index, isEmpty: pile.cards.length === 0 }))
+        .filter(p => p.isEmpty)
+        .map(p => p.index);
 
-          await executeMoveWithDelay(move.fromPile);
-
-          // Check if game is won after each move
-          const hasWon = prev.piles.every(pile => 
-            pile.cards.length === 0 || 
-            (pile.cards.length === 4 && pile.cards.every(card => card.value === pile.cards[0].value))
-          );
-
-          if (hasWon) break;
+      if (emptyPiles.length > 0) {
+        // Find cards that have matches somewhere else
+        for (const [value, piles] of valueMatches) {
+          if (piles.length > 1) {
+            const sourcePile = piles[0];
+            if (validateMove(sourcePile, emptyPiles[0])) {
+              return { fromPile: sourcePile, toPile: emptyPiles[0] };
+            }
+          }
         }
-      };
+      }
 
-      solveLoop();
-      return prev;
-    });
-  }, [makeMove]);
+      return null;
+    };
+
+    let moveCount = 0;
+    const maxMoves = 50; // Prevent infinite loops
+
+    while (moveCount < maxMoves && !state.gameWon) {
+      const move = findValidMoves();
+      if (!move) break;
+
+      makeMove(move.fromPile);
+      await sleep(300); // Match animation duration
+      moveCount++;
+    }
+  }, [state, makeMove, validateMove]);
 
   // Save state to localStorage whenever it changes
   useCallback(() => {
