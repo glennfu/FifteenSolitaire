@@ -170,32 +170,37 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       let validMoves = prev.validMoves;
       let moveIndex = 0;
 
-      // If this is a new pile selection, compute valid moves
+      // If this is a new pile selection, compute and sort valid moves
       if (prev.selectedPile !== pileId) {
-        validMoves = prev.piles
-          .map((pile, index) => ({ pile, index }))
-          .filter(({ pile, index }) => index !== pileId && validateMove(pileId, index))
-          .sort((a, b) => {
-            // Priority 1: Non-empty piles with matching rank
-            const aHasMatchingRank = a.pile.cards.length > 0 &&
-              a.pile.cards[a.pile.cards.length - 1].value === fromPile.cards[fromPile.cards.length - 1].value;
-            const bHasMatchingRank = b.pile.cards.length > 0 &&
-              b.pile.cards[b.pile.cards.length - 1].value === fromPile.cards[fromPile.cards.length - 1].value;
+        const movingCard = fromPile.cards[fromPile.cards.length - 1];
 
-            if (aHasMatchingRank !== bHasMatchingRank) {
-              return aHasMatchingRank ? -1 : 1;
-            }
+        // Get all possible target piles
+        const matchingPiles: number[] = [];
+        const emptyPiles: number[] = [];
 
-            // Priority 2: Empty piles - prefer nearest (by index distance)
-            if (a.pile.cards.length === 0 && b.pile.cards.length === 0) {
-              const aDistance = Math.abs(a.index - pileId);
-              const bDistance = Math.abs(b.index - pileId);
-              return aDistance - bDistance;
-            }
+        prev.piles.forEach((pile, index) => {
+          if (index === pileId) return; // Skip source pile
 
-            return 0;
-          })
-          .map(({ index }) => ({ fromPile: pileId, toPile: index }));
+          if (pile.cards.length === 0) {
+            emptyPiles.push(index);
+          } else if (pile.cards.length < 4 && 
+                    pile.cards[pile.cards.length - 1].value === movingCard.value) {
+            matchingPiles.push(index);
+          }
+        });
+
+        // Sort empty piles by distance from source
+        emptyPiles.sort((a, b) => {
+          const distA = Math.abs(a - pileId);
+          const distB = Math.abs(b - pileId);
+          return distA - distB;
+        });
+
+        // Combine moves in priority order
+        validMoves = [
+          ...matchingPiles.map(toPile => ({ fromPile: pileId, toPile })),
+          ...emptyPiles.map(toPile => ({ fromPile: pileId, toPile }))
+        ];
       } else if (prev.moveHistory.length > 0) {
         // Find next move in the existing sequence
         const lastMove = prev.moveHistory[prev.moveHistory.length - 1];
@@ -248,7 +253,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         validMoves: validMoves
       };
     });
-  }, [validateMove]);
+  }, []);
 
   const undo = useCallback(() => {
     setState(prev => {
