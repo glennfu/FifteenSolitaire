@@ -15,7 +15,7 @@ export function Board() {
           key={pile.id}
           pile={pile}
           onCardClick={(pileId) => makeMove(pileId)}
-          className="mt-8"
+          className="mt-2"
         />
       ))}
 
@@ -25,7 +25,7 @@ export function Board() {
           key={pile.id}
           pile={pile}
           onCardClick={(pileId) => makeMove(pileId)}
-          className="-mt-4"
+          className="-mt-8"
         />
       ))}
 
@@ -35,7 +35,7 @@ export function Board() {
           key={pile.id}
           pile={pile}
           onCardClick={(pileId) => makeMove(pileId)}
-          className="-mt-10"
+          className="-mt-14"
         />
       ))}
     </div>
