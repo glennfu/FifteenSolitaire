@@ -39,23 +39,27 @@ export default function Game() {
     initGame();
   }, [initGame]);
 
+  console.log("Debug mode:", state.debugMode); // Debug log
+
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Main game area */}
-      <div className="flex-1 p-4 overflow-y-auto">
-        <Board />
+    <div className="relative min-h-screen bg-background">
+      {/* Main content area */}
+      <div className="pb-20"> {/* Add padding to account for footer */}
+        <div className="p-4">
+          <Board />
+        </div>
 
         {/* Debug panel */}
         {state.debugMode && (
-          <div className="mt-4">
+          <div className="p-4 mt-4">
             <DebugPanel />
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <div className="sticky bottom-0 bg-background border-t p-4">
-        <div className="flex justify-between items-center max-w-3xl mx-auto">
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t">
+        <div className="max-w-3xl mx-auto p-4 flex justify-between items-center">
           <Menu />
           <div>
             <h1 className="text-2xl font-bold text-center">Fifteen</h1>
