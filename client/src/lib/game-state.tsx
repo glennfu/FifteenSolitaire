@@ -56,15 +56,16 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     const piles = Array(15).fill(null).map((_, index) => ({
       id: index,
       cards: [],
-      isEmpty: true
+      isEmpty: index === 5 || index === 9 // Keep piles 5 and 9 empty
     }));
 
-    // Distribute cards to piles
+    // Distribute cards only to non-empty piles
     let cardIndex = 0;
     piles.forEach((pile) => {
-      pile.cards = deck.slice(cardIndex, cardIndex + 4);
-      pile.isEmpty = pile.cards.length === 0;
-      cardIndex += 4;
+      if (!pile.isEmpty) {
+        pile.cards = deck.slice(cardIndex, cardIndex + 4);
+        cardIndex += 4;
+      }
     });
 
     setState(prev => ({
@@ -83,7 +84,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
     const movingCard = sourcePile.cards[sourcePile.cards.length - 1];
 
-    // Can always move to empty pile if there are matching cards elsewhere
+    // Can move to empty pile if there are matching cards elsewhere
     if (targetPile.cards.length === 0) {
       return state.piles.some((pile, i) =>
         i !== fromPile && i !== toPile &&
@@ -116,14 +117,14 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       newPiles[fromPile] = {
         ...sourcePile,
         cards: sourcePile.cards.slice(0, -1),
-        isEmpty: sourcePile.cards.length === 1
+        isEmpty: false // Keep original isEmpty state
       };
 
       // Update target pile
       newPiles[targetPileIndex] = {
         ...newPiles[targetPileIndex],
         cards: [...newPiles[targetPileIndex].cards, movingCard],
-        isEmpty: false
+        isEmpty: false // Keep original isEmpty state
       };
 
       // Check for win condition
