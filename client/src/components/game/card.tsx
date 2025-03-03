@@ -32,18 +32,20 @@ export function Card({ card, onClick, className, disabled }: CardProps) {
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-[4.5rem] h-[6rem] bg-white rounded-lg shadow-sm border-2 border-gray-200",
-        "flex items-center justify-center gap-2 px-2",
+        "w-[4.5rem] h-[6rem] bg-white rounded-lg shadow-md border-2 border-gray-200",
+        "relative",
         "transition-transform hover:scale-105 active:scale-95",
         "disabled:opacity-50 disabled:hover:scale-100",
         className
       )}
     >
-      <div className={cn("text-lg font-semibold", suitColor)}>
-        {value}
+      <div className="absolute top-1 left-2 flex gap-1">
+        <span className={cn("text-lg font-semibold", suitColor)}>{value}</span>
+        <span className={cn("text-lg", suitColor)}>{suitSymbol}</span>
       </div>
-      <div className={cn("text-xl", suitColor)}>
-        {suitSymbol}
+      <div className="absolute bottom-1 right-2 flex gap-1 rotate-180">
+        <span className={cn("text-lg font-semibold", suitColor)}>{value}</span>
+        <span className={cn("text-lg", suitColor)}>{suitSymbol}</span>
       </div>
     </button>
   );

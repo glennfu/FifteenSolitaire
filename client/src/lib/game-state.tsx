@@ -52,15 +52,15 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
   const initGame = useCallback(() => {
     const deck = shuffleDeck();
-    const piles = Array(13).fill(null).map((_, index) => ({
+    const piles = Array(15).fill(null).map((_, index) => ({
       id: index,
       cards: [],
-      isEmpty: index === 5 || index === 8
+      isEmpty: index === 6 || index === 9
     }));
 
     // Distribute cards to non-empty piles
     let cardIndex = 0;
-    piles.forEach((pile, index) => {
+    piles.forEach((pile) => {
       if (!pile.isEmpty) {
         pile.cards = deck.slice(cardIndex, cardIndex + 4);
         cardIndex += 4;
