@@ -29,7 +29,7 @@ export default function Game() {
   return (
     <div className="fixed inset-0 flex flex-col bg-background">
       {/* Remove top padding to eliminate empty space */}
-      <div className="flex-1 flex items-start justify-center p-4 pt-0">
+      <div className="flex-1 flex items-center justify-center p-4">
         <Board />
       </div>
 

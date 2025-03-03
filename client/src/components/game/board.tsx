@@ -11,7 +11,7 @@ export function Board() {
         userSelect: "none",
         // Increase row height to accommodate stacked cards (6rem card + 2rem stacking space)
         gridTemplateRows: "repeat(3, minmax(8rem, 1fr))",
-        paddingTop: "2rem" // Add some space from top
+        paddingTop: "1rem" // Add some space from top
       }}
     >
       {/* First row - 5 piles */}
