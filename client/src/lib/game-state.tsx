@@ -56,16 +56,15 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     const piles = Array(15).fill(null).map((_, index) => ({
       id: index,
       cards: [],
-      isEmpty: index === 5 || index === 9 // Piles 6 and 10 (0-based index)
+      isEmpty: true
     }));
 
-    // Distribute cards to non-empty piles
+    // Distribute cards to piles
     let cardIndex = 0;
     piles.forEach((pile) => {
-      if (!pile.isEmpty) {
-        pile.cards = deck.slice(cardIndex, cardIndex + 4);
-        cardIndex += 4;
-      }
+      pile.cards = deck.slice(cardIndex, cardIndex + 4);
+      pile.isEmpty = pile.cards.length === 0;
+      cardIndex += 4;
     });
 
     setState(prev => ({
@@ -84,48 +83,50 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
     const movingCard = sourcePile.cards[sourcePile.cards.length - 1];
 
-    // Can always move to empty pile
-    if (targetPile.cards.length === 0) return true;
+    // Can always move to empty pile if there are matching cards elsewhere
+    if (targetPile.cards.length === 0) {
+      return state.piles.some((pile, i) =>
+        i !== fromPile && i !== toPile &&
+        pile.cards.length > 0 &&
+        pile.cards[pile.cards.length - 1].value === movingCard.value
+      );
+    }
 
     // Can stack on matching values when pile isn't full
     const topCard = targetPile.cards[targetPile.cards.length - 1];
     return topCard.value === movingCard.value && targetPile.cards.length < 4;
   }, [state.piles]);
 
-  const makeMove = useCallback((pileId: number) => {
+  const makeMove = useCallback((fromPile: number) => {
     setState(prev => {
-      const fromPile = prev.piles[pileId];
-      if (!fromPile || fromPile.cards.length === 0) return prev;
+      const sourcePile = prev.piles[fromPile];
+      if (!sourcePile || sourcePile.cards.length === 0) return prev;
 
-      const validMove = prev.piles.findIndex((pile, index) =>
-        index !== pileId && validateMove(pileId, index)
+      // Find a valid target pile
+      const targetPileIndex = prev.piles.findIndex((pile, index) =>
+        index !== fromPile && validateMove(fromPile, index)
       );
 
-      if (validMove === -1) return prev;
+      if (targetPileIndex === -1) return prev;
 
       const newPiles = [...prev.piles];
-      const movingCard = fromPile.cards[fromPile.cards.length - 1];
+      const movingCard = sourcePile.cards[sourcePile.cards.length - 1];
 
-      // Remove card from source pile
-      newPiles[pileId] = {
-        ...fromPile,
-        cards: fromPile.cards.slice(0, -1)
+      // Update source pile
+      newPiles[fromPile] = {
+        ...sourcePile,
+        cards: sourcePile.cards.slice(0, -1),
+        isEmpty: sourcePile.cards.length === 1
       };
 
-      // Add card to target pile
-      newPiles[validMove] = {
-        ...newPiles[validMove],
-        cards: [...newPiles[validMove].cards, movingCard]
+      // Update target pile
+      newPiles[targetPileIndex] = {
+        ...newPiles[targetPileIndex],
+        cards: [...newPiles[targetPileIndex].cards, movingCard],
+        isEmpty: false
       };
 
-      // Record move in history
-      const newHistory = [...prev.moveHistory, {
-        fromPile: pileId,
-        toPile: validMove,
-        card: movingCard
-      }];
-
-      // Check win condition
+      // Check for win condition
       const hasWon = newPiles.every(pile =>
         pile.cards.length === 0 ||
         (pile.cards.length === 4 && pile.cards.every(card => card.value === pile.cards[0].value))
@@ -134,11 +135,15 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       return {
         ...prev,
         piles: newPiles,
-        moveHistory: newHistory,
+        moveHistory: [...prev.moveHistory, {
+          fromPile,
+          toPile: targetPileIndex,
+          card: movingCard
+        }],
         gamesWon: hasWon ? prev.gamesWon + 1 : prev.gamesWon
       };
     });
-  }, []);
+  }, [validateMove]);
 
   const undo = useCallback(() => {
     setState(prev => {
@@ -150,13 +155,15 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       // Remove card from target pile
       newPiles[lastMove.toPile] = {
         ...newPiles[lastMove.toPile],
-        cards: newPiles[lastMove.toPile].cards.slice(0, -1)
+        cards: newPiles[lastMove.toPile].cards.slice(0, -1),
+        isEmpty: newPiles[lastMove.toPile].cards.length === 1
       };
 
       // Add card back to source pile
       newPiles[lastMove.fromPile] = {
         ...newPiles[lastMove.fromPile],
-        cards: [...newPiles[lastMove.fromPile].cards, lastMove.card]
+        cards: [...newPiles[lastMove.fromPile].cards, lastMove.card],
+        isEmpty: false
       };
 
       return {
@@ -352,7 +359,6 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.piles, makeMove, validateMove]);
 
-  // Save state to localStorage whenever it changes
   useCallback(() => {
     localStorage.setItem("gameState", JSON.stringify(state));
   }, [state]);
