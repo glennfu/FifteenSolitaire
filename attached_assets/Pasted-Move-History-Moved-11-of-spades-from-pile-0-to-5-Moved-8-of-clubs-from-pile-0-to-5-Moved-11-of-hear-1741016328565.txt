@@ -1,0 +1,111 @@
+Move History:
+Moved 11 of spades from pile 0 to 5
+Moved 8 of clubs from pile 0 to 5
+Moved 11 of hearts from pile 1 to 5
+Moved 8 of hearts from pile 1 to 5
+Moved 11 of diamonds from pile 4 to 5
+Moved 6 of spades from pile 2 to 5
+Moved 2 of clubs from pile 13 to 5
+Moved 3 of spades from pile 0 to 5
+Moved 5 of hearts from pile 0 to 5
+Moved 4 of hearts from pile 7 to 5
+Moved 4 of spades from pile 8 to 5
+Moved 2 of diamonds from pile 1 to 5
+Moved 9 of hearts from pile 10 to 5
+Moved 2 of spades from pile 8 to 5
+Moved 3 of diamonds from pile 8 to 5
+Moved 3 of clubs from pile 13 to 5
+Moved 4 of clubs from pile 13 to 5
+Moved 9 of clubs from pile 7 to 5
+Moved 8 of spades from pile 7 to 5
+Moved 11 of clubs from pile 7 to 5
+Moved 10 of diamonds from pile 6 to 5
+Moved 10 of spades from pile 11 to 5
+Moved 6 of clubs from pile 4 to 5
+Moved 12 of clubs from pile 14 to 5
+Moved 6 of diamonds from pile 11 to 5
+Moved 9 of spades from pile 14 to 5
+Moved 1 of clubs from pile 14 to 5
+Moved 7 of clubs from pile 4 to 5
+Moved 1 of hearts from pile 12 to 5
+Moved 10 of hearts from pile 11 to 5
+Moved 5 of clubs from pile 4 to 5
+Moved 9 of diamonds from pile 11 to 5
+Moved 1 of diamonds from pile 1 to 5
+Moved 7 of hearts from pile 3 to 5
+Moved 13 of hearts from pile 3 to 5
+Moved 6 of hearts from pile 12 to 5
+Moved 2 of hearts from pile 3 to 5
+Moved 12 of diamonds from pile 3 to 5
+Moved 12 of spades from pile 6 to 5
+Moved 13 of diamonds from pile 6 to 5
+Moved 13 of clubs from pile 10 to 5
+Moved 13 of spades from pile 10 to 5
+Moved 7 of spades from pile 12 to 5
+Moved 4 of diamonds from pile 6 to 5
+Moved 10 of clubs from pile 12 to 5
+Moved 5 of diamonds from pile 10 to 5
+Moved 5 of spades from pile 2 to 5
+Moved 7 of diamonds from pile 2 to 5
+Moved 1 of spades from pile 2 to 5
+Pile States:
+Pile 0: 0 cards
+Pile 1: 0 cards
+Pile 2: 0 cards
+Pile 3: 0 cards
+Pile 4: 0 cards
+Pile 5: 49 cards (Top: 1 of spades)
+Pile 6: 0 cards
+Pile 7: 0 cards
+Pile 8: 1 cards (Top: 12 of hearts)
+Pile 9: 0 cards
+Pile 10: 0 cards
+Pile 11: 0 cards
+Pile 12: 0 cards
+Pile 13: 1 cards (Top: 3 of hearts)
+Pile 14: 1 cards (Top: 8 of diamonds)
+Valid Moves:
+Can move from pile 5 to 0
+Can move from pile 5 to 1
+Can move from pile 5 to 2
+Can move from pile 5 to 3
+Can move from pile 5 to 4
+Can move from pile 5 to 6
+Can move from pile 5 to 7
+Can move from pile 5 to 9
+Can move from pile 5 to 10
+Can move from pile 5 to 11
+Can move from pile 5 to 12
+Can move from pile 8 to 0
+Can move from pile 8 to 1
+Can move from pile 8 to 2
+Can move from pile 8 to 3
+Can move from pile 8 to 4
+Can move from pile 8 to 6
+Can move from pile 8 to 7
+Can move from pile 8 to 9
+Can move from pile 8 to 10
+Can move from pile 8 to 11
+Can move from pile 8 to 12
+Can move from pile 13 to 0
+Can move from pile 13 to 1
+Can move from pile 13 to 2
+Can move from pile 13 to 3
+Can move from pile 13 to 4
+Can move from pile 13 to 6
+Can move from pile 13 to 7
+Can move from pile 13 to 9
+Can move from pile 13 to 10
+Can move from pile 13 to 11
+Can move from pile 13 to 12
+Can move from pile 14 to 0
+Can move from pile 14 to 1
+Can move from pile 14 to 2
+Can move from pile 14 to 3
+Can move from pile 14 to 4
+Can move from pile 14 to 6
+Can move from pile 14 to 7
+Can move from pile 14 to 9
+Can move from pile 14 to 10
+Can move from pile 14 to 11
+Can move from pile 14 to 12
