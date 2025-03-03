@@ -44,9 +44,9 @@ export function Card({ card, onClick, className, disabled }: CardProps) {
         "w-[4.5rem] h-[6rem] rounded-lg border-2",
         "relative",
         "transition-all duration-300 ease-in-out",
-        "bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700",
+        "bg-white dark:bg-slate-800",
+        "border-gray-200 dark:border-gray-700",
         "hover:scale-105 active:scale-95",
-        "shadow-sm hover:shadow-md",
         disabled && "opacity-75 hover:scale-100 active:scale-100",
         className
       )}

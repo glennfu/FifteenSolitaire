@@ -223,32 +223,31 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
             const targetPile = prev.piles[toPile];
 
             if (sourcePile.cards.length === 0) continue;
-            if (targetPile.cards.length === 0) continue;
+            if (targetPile.cards.length >= 4) continue;
 
             const movingCard = sourcePile.cards[sourcePile.cards.length - 1];
-            const topTargetCard = targetPile.cards[targetPile.cards.length - 1];
 
-            if (movingCard.value === topTargetCard.value) {
-              return { fromPile, toPile };
+            // If target pile has cards, match by value
+            if (targetPile.cards.length > 0) {
+              const topTargetCard = targetPile.cards[targetPile.cards.length - 1];
+              if (movingCard.value === topTargetCard.value) {
+                return { fromPile, toPile };
+              }
+            }
+            // If target pile is empty and we have matching cards elsewhere
+            else if (targetPile.cards.length === 0) {
+              // Check if there are other cards with same value
+              for (let checkPile = 0; checkPile < prev.piles.length; checkPile++) {
+                if (checkPile === fromPile || checkPile === toPile) continue;
+                const checkPileCards = prev.piles[checkPile].cards;
+                if (checkPileCards.length > 0 && 
+                    checkPileCards[checkPileCards.length - 1].value === movingCard.value) {
+                  return { fromPile, toPile };
+                }
+              }
             }
           }
         }
-
-        // Priority 2: Move to empty pile if no matching moves
-        for (let fromPile = 0; fromPile < prev.piles.length; fromPile++) {
-          for (let toPile = 0; toPile < prev.piles.length; toPile++) {
-            if (fromPile === toPile) continue;
-
-            const sourcePile = prev.piles[fromPile];
-            const targetPile = prev.piles[toPile];
-
-            if (sourcePile.cards.length === 0) continue;
-            if (targetPile.cards.length !== 0) continue;
-
-            return { fromPile, toPile };
-          }
-        }
-
         return null;
       };
 
