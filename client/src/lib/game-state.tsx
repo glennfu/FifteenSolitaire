@@ -271,60 +271,58 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       return completePiles === 13;
     }
 
-    function getValidMoves(state: State): Move[] {
+    function getValidMoves(piles: GamePile[]): Move[] {
       const moves: Move[] = [];
-      for (let i = 0; i < state.length; i++) {
-        if (state[i].length === 0) continue;
 
-        const card = state[i][state[i].length - 1];
-        for (let j = 0; j < state.length; j++) {
-          if (i === j) continue;
-
-          if (state[j].length === 0) {
-            moves.push({ from: i, to: j });
-          } else if (state[j].length < 4) {
-            const top = state[j][state[j].length - 1];
-            if (top === card) {
-              moves.push({ from: i, to: j });
-            }
+      // Use the game's validateMove function to check moves
+      for (let from = 0; from < piles.length; from++) {
+        for (let to = 0; to < piles.length; to++) {
+          if (from === to) continue;
+          if (validateMove(from, to)) {
+            moves.push({ from, to });
           }
         }
       }
       return moves;
     }
 
-    function applyMove(state: State, move: Move): State {
-      const newState = state.map(pile => [...pile]);
-      const card = newState[move.from].pop()!;
-      newState[move.to].push(card);
-      return newState;
+    function applyMove(piles: GamePile[], move: Move): GamePile[] {
+      const newPiles = piles.map(pile => ({
+        ...pile,
+        cards: [...pile.cards]
+      }));
+
+      const movingCard = newPiles[move.from].cards.pop()!;
+      newPiles[move.to].cards.push(movingCard);
+      return newPiles;
     }
 
-    function solve(startState: State): Move[] | null {
+    function solve(startPiles: GamePile[]): Move[] | null {
       // Iterative DFS using a stack to prevent recursion overflow
-      const stack: Array<{state: State, moves: Move[]}> = [{
-        state: startState,
+      const stack: Array<{piles: GamePile[], moves: Move[]}> = [{
+        piles: startPiles,
         moves: []
       }];
       const visited = new Set<string>();
 
       while (stack.length > 0) {
         const current = stack.pop()!;
+        const simpleState = toSimpleState(current.piles);
 
-        if (isGoal(current.state)) {
+        if (isGoal(simpleState)) {
           return current.moves;
         }
 
-        const key = current.state.map(pile => pile.join(',')).join('|');
+        const key = simpleState.map(pile => pile.join(',')).join('|');
         if (visited.has(key)) continue;
         visited.add(key);
 
-        // Get valid moves and try each one
-        const moves = getValidMoves(current.state);
+        // Get valid moves for current state
+        const moves = getValidMoves(current.piles);
         for (const move of moves) {
-          const nextState = applyMove(current.state, move);
+          const nextPiles = applyMove(current.piles, move);
           stack.push({
-            state: nextState,
+            piles: nextPiles,
             moves: [...current.moves, move]
           });
         }
@@ -333,12 +331,8 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       return null;
     }
 
-    // Convert current game state to simple state
-    const simpleState = toSimpleState(state.piles);
-    console.log("Starting solve with state:", simpleState);
-
-    // Find solution
-    const solution = solve(simpleState);
+    console.log("Starting solve...");
+    const solution = solve(state.piles);
 
     if (solution) {
       console.log("Solution found:", solution);
@@ -350,7 +344,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     } else {
       console.log("No solution found");
     }
-  }, [state.piles, makeMove]);
+  }, [state.piles, makeMove, validateMove]);
 
   // Save state to localStorage whenever it changes
   useCallback(() => {
