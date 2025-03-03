@@ -184,112 +184,121 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const solve = useCallback(async () => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    type SimplePile = number[];
-    type SimpleState = SimplePile[];
-    type Move = { from: number; to: number };
+    // Simple state with both rank and suit
+    interface SimpleCard {
+      rank: number;  // card value
+      suit: string;  // card suit
+    }
+    type SimplePile = SimpleCard[];
+    type State = SimplePile[];
+    type Move = { from: number, to: number };
 
-    // Convert state to simple number arrays (card values only)
-    function toSimpleState(piles: GamePile[]): SimpleState {
-      return piles.map(pile => pile.cards.map(card => card.value));
+    function toSimpleState(piles: GamePile[]): State {
+      return piles.map(pile =>
+        pile.cards.map(card => ({
+          rank: card.value,
+          suit: card.suit
+        }))
+      );
     }
 
-    function getValidMoves(state: SimpleState): Move[] {
-      const moves: Move[] = [];
+    function isGoal(state: State): boolean {
+      let completePiles = 0;
+      for (const pile of state) {
+        if (pile.length === 0) continue;
+        if (pile.length !== 4) return false;
+        // All cards in pile must have same rank
+        if (!pile.every(card => card.rank === pile[0].rank)) return false;
+        completePiles++;
+      }
+      return completePiles === 13;
+    }
 
+    function getValidMoves(state: State): Move[] {
+      const moves: Move[] = [];
       for (let from = 0; from < state.length; from++) {
         if (state[from].length === 0) continue;
-        const fromValue = state[from][state[from].length - 1];
+        const card = state[from][state[from].length - 1];
 
         for (let to = 0; to < state.length; to++) {
           if (from === to) continue;
 
-          // Can always move to empty pile
+          // Can move to empty pile
           if (state[to].length === 0) {
             moves.push({ from, to });
             continue;
           }
 
-          // Can only stack on matching values when pile isn't full
-          if (state[to].length < 4) {
-            const toValue = state[to][state[to].length - 1];
-            if (toValue === fromValue) {
-              moves.push({ from, to });
-            }
+          // Can stack on matching rank when pile isn't full
+          const topCard = state[to][state[to].length - 1];
+          if (state[to].length < 4 && topCard.rank === card.rank) {
+            moves.push({ from, to });
           }
         }
       }
-
-      console.log(`Found ${moves.length} valid moves`);
       return moves;
     }
 
-    function applyMove(state: SimpleState, move: Move): SimpleState {
+    function applyMove(state: State, move: Move): State {
       const newState = state.map(pile => [...pile]);
       const card = newState[move.from].pop()!;
       newState[move.to].push(card);
       return newState;
     }
 
-    function isWinningState(state: SimpleState): boolean {
-      let completePiles = 0;
-      for (const pile of state) {
-        if (pile.length === 0) continue;
-        if (pile.length !== 4) continue;
-        if (pile.every(v => v === pile[0])) {
-          completePiles++;
-        }
-      }
-      return completePiles === 13;
-    }
-
-    function stateToString(state: SimpleState): string {
+    function stateToString(state: State): string {
       return state
-        .map(pile => pile.length === 0 ? '-' : [...pile].sort().join(','))
+        .map(pile =>
+          pile.length === 0 ? '-' :
+            [...pile]
+              .sort((a, b) => a.rank - b.rank || a.suit.localeCompare(b.suit))
+              .map(card => `${card.rank}-${card.suit}`)
+              .join(',')
+        )
         .sort()
         .join('|');
     }
 
-    async function findSolution(
-      state: SimpleState,
-      visited = new Set<string>(),
-      path: Move[] = []
-    ): Promise<Move[] | null> {
-      const stateKey = stateToString(state);
-      if (visited.has(stateKey)) return null;
-      visited.add(stateKey);
+    function solve(state: State): Move[] | null {
+      const visited = new Set<string>();
+      const stack: Array<{ state: State, path: Move[] }> = [{
+        state,
+        path: []
+      }];
 
-      if (path.length % 100 === 0) {
-        console.log(`Search depth: ${path.length}, States visited: ${visited.size}`);
-        await sleep(0);
-      }
+      while (stack.length > 0) {
+        const current = stack.pop()!;
 
-      if (isWinningState(state)) {
-        console.log("Found winning state!");
-        return path;
-      }
-
-      const moves = getValidMoves(state);
-      console.log(`Depth ${path.length}: Trying ${moves.length} moves`);
-
-      // Sort moves by priority - prefer moves that complete sets
-      moves.sort((a, b) => {
-        const stateA = applyMove(state, a);
-        const stateB = applyMove(state, b);
-        const completeA = stateA[a.to].length === 4;
-        const completeB = stateB[b.to].length === 4;
-        return Number(completeB) - Number(completeA);
-      });
-
-      for (const move of moves) {
-        // Verify move is valid in the actual game state
-        if (!validateMove(move.from, move.to)) {
-          console.log(`Invalid move: ${move.from} -> ${move.to}`);
-          continue;
+        if (isGoal(current.state)) {
+          console.log("Found winning state!");
+          return current.path;
         }
 
-        const nextState = applyMove(state, move);
-        const solution = await findSolution(nextState, visited, [...path, move]);
-        if (solution) return solution;
+        const stateKey = stateToString(current.state);
+        if (visited.has(stateKey)) continue;
+        visited.add(stateKey);
+
+        if (current.path.length % 100 === 0) {
+          console.log(`Depth: ${current.path.length}, States visited: ${visited.size}`);
+        }
+
+        // Get valid moves and sort by priority
+        const moves = getValidMoves(current.state)
+          .filter(move => validateMove(move.from, move.to))
+          .sort((a, b) => {
+            const stateA = applyMove(current.state, a);
+            const stateB = applyMove(current.state, b);
+            // Prioritize moves that complete sets
+            return (stateB[b.to].length === 4 ? 1 : 0) -
+              (stateA[a.to].length === 4 ? 1 : 0);
+          });
+
+        for (const move of moves) {
+          stack.push({
+            state: applyMove(current.state, move),
+            path: [...current.path, move]
+          });
+        }
       }
 
       return null;
@@ -299,14 +308,18 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     const initialState = toSimpleState(state.piles);
     console.log("Initial state:", initialState);
 
-    const solution = await findSolution(initialState);
+    const solution = solve(initialState);
 
     if (solution) {
       console.log("Solution found! Executing moves...");
       for (const move of solution) {
-        console.log(`Executing move: ${move.from} -> ${move.to}`);
-        makeMove(move.from);
-        await sleep(300);
+        if (validateMove(move.from, move.to)) {
+          makeMove(move.from);
+          await sleep(300);
+        } else {
+          console.log("Invalid move detected:", move);
+          break;
+        }
       }
     } else {
       console.log("No solution found");
