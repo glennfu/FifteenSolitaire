@@ -234,7 +234,6 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadGame = useCallback((savedState: GameState) => {
-    //  gameStateSchema.safeParse(savedState) is removed because it's not used in the original code and causes errors.
     setState(savedState);
   }, []);
 
@@ -260,7 +259,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         if (!pile.cards.every(c => c.value === pile.cards[0].value)) return false;
         completePiles++;
       }
-      return completePiles === 13; // We need 13 complete sets (one for each value)
+      return completePiles === 13;
     }
 
     function getValidMoves(piles: GamePile[]): {fromPile: number, toPile: number}[] {
@@ -268,7 +267,6 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
       for (let i = 0; i < piles.length; i++) {
         if (piles[i].cards.length === 0) continue;
-
         const card = piles[i].cards[piles[i].cards.length - 1];
 
         for (let j = 0; j < piles.length; j++) {
@@ -291,60 +289,68 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       return piles
         .map(pile =>
           pile.cards.length === 0 ? "-" :
-            pile.cards.map(card => `${card.value}-${card.suit}`).join(",")
+            pile.cards.map(card => `${card.value}`).join(",")
         )
         .join("|");
     }
 
-    async function findSolution(
-      currentPiles: GamePile[],
-      visited = new Set<string>(),
-      path: {fromPile: number, toPile: number}[] = []
-    ): Promise<{fromPile: number, toPile: number}[] | null> {
-      if (isGoal(currentPiles)) return path;
+    async function findSolution(piles: GamePile[]): Promise<{fromPile: number, toPile: number}[] | null> {
+      const visited = new Set<string>();
+      const path: {fromPile: number, toPile: number}[] = [];
 
-      const stateKey = pileStateToString(currentPiles);
-      if (visited.has(stateKey)) return null;
-      visited.add(stateKey);
+      async function dfs(currentPiles: GamePile[]): Promise<boolean> {
+        if (isGoal(currentPiles)) return true;
 
-      const validMoves = getValidMoves(currentPiles);
+        const stateKey = pileStateToString(currentPiles);
+        if (visited.has(stateKey)) return false;
+        visited.add(stateKey);
 
-      for (const move of validMoves) {
-        // Deep clone the current state
-        const nextPiles = currentPiles.map(pile => ({
-          ...pile,
-          cards: [...pile.cards]
-        }));
+        const validMoves = getValidMoves(currentPiles);
+        for (const move of validMoves) {
+          // Deep clone the current state
+          const nextPiles = currentPiles.map(pile => ({
+            ...pile,
+            cards: [...pile.cards]
+          }));
 
-        // Apply the move
-        const movingCard = nextPiles[move.fromPile].cards.pop()!;
-        nextPiles[move.toPile].cards.push(movingCard);
+          // Apply the move
+          const movingCard = nextPiles[move.fromPile].cards.pop()!;
+          nextPiles[move.toPile].cards.push(movingCard);
 
-        // Recursively search for solution
-        const result = await findSolution(nextPiles, visited, [...path, move]);
-        if (result) return result;
+          path.push(move);
+          if (await dfs(nextPiles)) return true;
+          path.pop();
 
-        // Add small delay to prevent UI freezing
-        await sleep(10);
+          await sleep(1); // Prevent UI freeze
+        }
+
+        return false;
       }
 
-      return null;
+      const solved = await dfs([...piles]);
+      return solved ? path : null;
     }
 
     console.log("Starting solve algorithm");
-    const solution = await findSolution(state.piles);
+    setState(prev => {
+      const solution = findSolution(prev.piles);
 
-    if (solution) {
-      console.log("Solution found:", solution);
-      // Execute the solution moves with animation delays
-      for (const move of solution) {
-        makeMove(move.fromPile);
-        await sleep(300); // Animation delay
-      }
-    } else {
-      console.log("No solution found");
-    }
-  }, [state, makeMove]);
+      // Execute solution asynchronously
+      solution.then(async moves => {
+        if (moves) {
+          console.log("Solution found:", moves);
+          for (const move of moves) {
+            makeMove(move.fromPile);
+            await sleep(300); // Animation delay
+          }
+        } else {
+          console.log("No solution found");
+        }
+      });
+
+      return prev;
+    });
+  }, [makeMove]);
 
   // Save state to localStorage whenever it changes
   useCallback(() => {
