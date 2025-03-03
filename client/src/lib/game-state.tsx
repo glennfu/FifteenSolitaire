@@ -86,13 +86,16 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
     // Check if move is to empty pile
     if (targetPile.cards.length === 0) {
-      // Only allow if there are matching cards elsewhere
+      // Allow moves to empty piles if:
+      // 1. It's one of the initially empty piles (5 or 9), or
+      // 2. There are matching cards elsewhere
+      const isInitiallyEmptyPile = targetPile.isEmpty;
       const hasMatches = state.piles.some((pile, i) =>
         i !== fromPile && i !== toPile &&
         pile.cards.length > 0 &&
         pile.cards[pile.cards.length - 1].value === movingCard.value
       );
-      return hasMatches;
+      return isInitiallyEmptyPile || hasMatches;
     }
 
     // Check if move is stacking on matching value
