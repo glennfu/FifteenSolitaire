@@ -12,32 +12,39 @@ export function Board() {
         gridTemplateRows: "repeat(3, minmax(6rem, 1fr))",
       }}
     >
-      {/* First row - 5 piles */}
-      {state.piles.slice(0, 5).map((pile) => (
-        <Pile
-          key={pile.id}
-          pile={pile}
-          onCardClick={(pileId) => makeMove(pileId)}
-        />
-      ))}
+      {/* Add debug borders to visualize grid cells */}
+      <div className="col-span-5 grid grid-cols-5 gap-2 border-2 border-blue-500 p-2">
+        {state.piles.slice(0, 5).map((pile) => (
+          <div key={pile.id} className="border-2 border-red-500">
+            <Pile
+              pile={pile}
+              onCardClick={(pileId) => makeMove(pileId)}
+            />
+          </div>
+        ))}
+      </div>
 
-      {/* Middle row - 5 piles */}
-      {state.piles.slice(5, 10).map((pile) => (
-        <Pile
-          key={pile.id}
-          pile={pile}
-          onCardClick={(pileId) => makeMove(pileId)}
-        />
-      ))}
+      <div className="col-span-5 grid grid-cols-5 gap-2 border-2 border-green-500 p-2">
+        {state.piles.slice(5, 10).map((pile) => (
+          <div key={pile.id} className="border-2 border-red-500">
+            <Pile
+              pile={pile}
+              onCardClick={(pileId) => makeMove(pileId)}
+            />
+          </div>
+        ))}
+      </div>
 
-      {/* Bottom row - 5 piles */}
-      {state.piles.slice(10, 15).map((pile) => (
-        <Pile
-          key={pile.id}
-          pile={pile}
-          onCardClick={(pileId) => makeMove(pileId)}
-        />
-      ))}
+      <div className="col-span-5 grid grid-cols-5 gap-2 border-2 border-yellow-500 p-2">
+        {state.piles.slice(10, 15).map((pile) => (
+          <div key={pile.id} className="border-2 border-red-500">
+            <Pile
+              pile={pile}
+              onCardClick={(pileId) => makeMove(pileId)}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
