@@ -186,9 +186,11 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
           if (pile.cards.length === 0) {
             emptyPiles.push(index);
-          } else if (pile.cards.length < 4 && 
-                    pile.cards[pile.cards.length - 1].value === movingCard.value) {
-            matchingPiles.push(index);
+          } else {
+            const topCard = pile.cards[pile.cards.length - 1];
+            if (topCard.value === movingCard.value && pile.cards.length < 4) {
+              matchingPiles.push(index);
+            }
           }
         });
 
