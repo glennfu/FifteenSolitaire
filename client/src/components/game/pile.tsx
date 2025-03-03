@@ -15,8 +15,9 @@ export function Pile({ pile, onCardClick, className, disabled }: PileProps) {
   return (
     <div 
       className={cn(
-        "relative w-[4.5rem] min-h-[9rem]", 
-        pile.isEmpty && "border-2 border-dashed border-gray-300 rounded-lg",
+        "relative w-[4.5rem]",
+        pile.cards.length === 0 ? "h-[6rem]" : "min-h-[9rem]", 
+        pile.cards.length === 0 && "border-2 border-dashed border-gray-300 rounded-lg", 
         className
       )}
     >
