@@ -59,18 +59,20 @@ interface GameState {
   gamesWon: number;
   debugMode: boolean;
   gameWon: boolean;
+  selectedPile: number | null;
+  validMoves: { fromPile: number; toPile: number }[];
 }
 
 
 function isGoalState(piles: GamePile[]): boolean {
-  return piles.every(pile => 
-    pile.cards.length === 0 || 
+  return piles.every(pile =>
+    pile.cards.length === 0 ||
     (pile.cards.length === 4 && pile.cards.every(card => card.value === pile.cards[0].value))
   );
 }
 
-function getValidMoves(piles: GamePile[]): {fromPile: number, toPile: number}[] {
-  const moves: {fromPile: number, toPile: number}[] = [];
+function getValidMoves(piles: GamePile[]): { fromPile: number; toPile: number }[] {
+  const moves: { fromPile: number; toPile: number }[] = [];
 
   for (let fromPile = 0; fromPile < piles.length; fromPile++) {
     if (piles[fromPile].cards.length === 0) continue;
@@ -111,7 +113,9 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     moveHistory: [],
     gamesWon: 0,
     debugMode: false,
-    gameWon: false
+    gameWon: false,
+    selectedPile: null,
+    validMoves: []
   });
 
   const initGame = useCallback(() => {
@@ -135,22 +139,24 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       piles,
       moveHistory: [],
-      gameWon: false
+      gameWon: false,
+      selectedPile: null,
+      validMoves: []
     }));
   }, []);
 
   const validateMove = useCallback((fromPile: number, toPile: number): boolean => {
     const sourcePile = state.piles[fromPile];
     const targetPile = state.piles[toPile];
-    
+
     if (!sourcePile || !targetPile) return false;
     if (sourcePile.cards.length === 0) return false;
-    
+
     const movingCard = sourcePile.cards[sourcePile.cards.length - 1];
-    
+
     // Can always move to empty pile
     if (targetPile.cards.length === 0) return true;
-    
+
     // Can stack on matching values when pile isn't full
     const topCard = targetPile.cards[targetPile.cards.length - 1];
     return topCard.value === movingCard.value && targetPile.cards.length < 4;
@@ -158,50 +164,50 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
   const makeMove = useCallback((pileId: number) => {
     setState(prev => {
-      // Find first valid move for the selected pile
       const fromPile = prev.piles[pileId];
       if (!fromPile || fromPile.cards.length === 0) return prev;
 
-      // Get all valid moves for this pile
-      const validMoves = prev.piles
-        .map((pile, index) => ({ pile, index }))
-        .filter(({ pile, index }) => index !== pileId && validateMove(pileId, index))
-        .sort((a, b) => {
-          // Priority 1: Non-empty piles with matching rank
-          const aHasMatchingRank = a.pile.cards.length > 0 && 
-                                 a.pile.cards[a.pile.cards.length - 1].value === fromPile.cards[fromPile.cards.length - 1].value;
-          const bHasMatchingRank = b.pile.cards.length > 0 && 
-                                 b.pile.cards[b.pile.cards.length - 1].value === fromPile.cards[fromPile.cards.length - 1].value;
-
-          if (aHasMatchingRank !== bHasMatchingRank) {
-            return aHasMatchingRank ? -1 : 1;
-          }
-
-          // Priority 2: Empty piles - prefer nearest (by index distance)
-          if (a.pile.cards.length === 0 && b.pile.cards.length === 0) {
-            const aDistance = Math.abs(a.index - pileId);
-            const bDistance = Math.abs(b.index - pileId);
-            return aDistance - bDistance;
-          }
-
-          return 0;
-        });
-
-      if (validMoves.length === 0) return prev;
-
-      // Find the next valid move after the last one in history
+      let validMoves = prev.validMoves;
       let moveIndex = 0;
-      if (prev.moveHistory.length > 0) {
+
+      // If this is a new pile selection, compute valid moves
+      if (prev.selectedPile !== pileId) {
+        validMoves = prev.piles
+          .map((pile, index) => ({ pile, index }))
+          .filter(({ pile, index }) => index !== pileId && validateMove(pileId, index))
+          .sort((a, b) => {
+            // Priority 1: Non-empty piles with matching rank
+            const aHasMatchingRank = a.pile.cards.length > 0 &&
+              a.pile.cards[a.pile.cards.length - 1].value === fromPile.cards[fromPile.cards.length - 1].value;
+            const bHasMatchingRank = b.pile.cards.length > 0 &&
+              b.pile.cards[b.pile.cards.length - 1].value === fromPile.cards[fromPile.cards.length - 1].value;
+
+            if (aHasMatchingRank !== bHasMatchingRank) {
+              return aHasMatchingRank ? -1 : 1;
+            }
+
+            // Priority 2: Empty piles - prefer nearest (by index distance)
+            if (a.pile.cards.length === 0 && b.pile.cards.length === 0) {
+              const aDistance = Math.abs(a.index - pileId);
+              const bDistance = Math.abs(b.index - pileId);
+              return aDistance - bDistance;
+            }
+
+            return 0;
+          })
+          .map(({ index }) => ({ fromPile: pileId, toPile: index }));
+      } else if (prev.moveHistory.length > 0) {
+        // Find next move in the existing sequence
         const lastMove = prev.moveHistory[prev.moveHistory.length - 1];
         if (lastMove.fromPile === pileId) {
-          // Find the index of the last target pile in our valid moves
-          const lastIndex = validMoves.findIndex(({ index }) => index === lastMove.toPile);
+          const lastIndex = validMoves.findIndex(move => move.toPile === lastMove.toPile);
           if (lastIndex !== -1) {
-            // Take the next move in the sequence
             moveIndex = (lastIndex + 1) % validMoves.length;
           }
         }
       }
+
+      if (validMoves.length === 0) return prev;
 
       const targetMove = validMoves[moveIndex];
       const movingCard = fromPile.cards[fromPile.cards.length - 1];
@@ -214,21 +220,21 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       };
 
       // Add card to target pile
-      newPiles[targetMove.index] = {
-        ...newPiles[targetMove.index],
-        cards: [...newPiles[targetMove.index].cards, movingCard]
+      newPiles[targetMove.toPile] = {
+        ...newPiles[targetMove.toPile],
+        cards: [...newPiles[targetMove.toPile].cards, movingCard]
       };
 
       // Record move in history
       const newHistory = [...prev.moveHistory, {
         fromPile: pileId,
-        toPile: targetMove.index,
+        toPile: targetMove.toPile,
         card: movingCard
       }];
 
       // Check win condition
-      const hasWon = newPiles.every(pile => 
-        pile.cards.length === 0 || 
+      const hasWon = newPiles.every(pile =>
+        pile.cards.length === 0 ||
         (pile.cards.length === 4 && pile.cards.every(card => card.value === pile.cards[0].value))
       );
 
@@ -237,7 +243,9 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         piles: newPiles,
         moveHistory: newHistory,
         gamesWon: hasWon ? prev.gamesWon + 1 : prev.gamesWon,
-        gameWon: hasWon
+        gameWon: hasWon,
+        selectedPile: pileId,
+        validMoves: validMoves
       };
     });
   }, [validateMove]);
@@ -245,26 +253,28 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const undo = useCallback(() => {
     setState(prev => {
       if (prev.moveHistory.length === 0) return prev;
-      
+
       const lastMove = prev.moveHistory[prev.moveHistory.length - 1];
       const newPiles = [...prev.piles];
-      
+
       // Remove card from target pile
       newPiles[lastMove.toPile] = {
         ...newPiles[lastMove.toPile],
         cards: newPiles[lastMove.toPile].cards.slice(0, -1)
       };
-      
+
       // Add card back to source pile
       newPiles[lastMove.fromPile] = {
         ...newPiles[lastMove.fromPile],
         cards: [...newPiles[lastMove.fromPile].cards, lastMove.card]
       };
-      
+
       return {
         ...prev,
         piles: newPiles,
-        moveHistory: prev.moveHistory.slice(0, -1)
+        moveHistory: prev.moveHistory.slice(0, -1),
+        selectedPile: null,
+        validMoves: []
       };
     });
   }, []);
@@ -291,8 +301,8 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     async function findSolution(
       currentPiles: GamePile[],
       visited = new Set<string>(),
-      path: {fromPile: number, toPile: number}[] = []
-    ): Promise<{fromPile: number, toPile: number}[] | null> {
+      path: { fromPile: number; toPile: number }[] = []
+    ): Promise<{ fromPile: number; toPile: number }[] | null> {
       if (isGoalState(currentPiles)) return path;
 
       const stateKey = pileStateToString(currentPiles);
@@ -338,7 +348,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   }, [state]);
 
   return (
-    <GameContext.Provider 
+    <GameContext.Provider
       value={{
         state,
         makeMove,
