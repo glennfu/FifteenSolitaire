@@ -254,6 +254,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     // Simple state representation
     type SimplePile = number[]; // Just card values
     type SimpleState = SimplePile[];
+    type Move = { from: number, to: number };
 
     function simplifyState(piles: GamePile[]): SimpleState {
       return piles.map(pile => pile.cards.map(card => card.value));
@@ -270,20 +271,19 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       return completePiles === 13;
     }
 
-    function getValidMoves(state: SimpleState): {from: number, to: number}[] {
-      const moves: {from: number, to: number}[] = [];
+    function getValidMoves(state: SimpleState): Move[] {
+      const moves: Move[] = [];
       for (let i = 0; i < state.length; i++) {
         if (state[i].length === 0) continue;
         const card = state[i][state[i].length - 1];
 
         for (let j = 0; j < state.length; j++) {
           if (i === j) continue;
-
           if (state[j].length === 0) {
             moves.push({ from: i, to: j });
-          } else {
+          } else if (state[j].length < 4) {
             const top = state[j][state[j].length - 1];
-            if (top === card && state[j].length < 4) {
+            if (top === card) {
               moves.push({ from: i, to: j });
             }
           }
@@ -292,7 +292,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       return moves;
     }
 
-    function applyMove(state: SimpleState, move: {from: number, to: number}): SimpleState {
+    function applyMove(state: SimpleState, move: Move): SimpleState {
       const newState = state.map(pile => [...pile]);
       const card = newState[move.from].pop()!;
       newState[move.to].push(card);
@@ -300,21 +300,52 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     }
 
     function stateToString(state: SimpleState): string {
-      return state.map(pile => pile.join(',')).join('|');
+      return state.map(pile => pile.length === 0 ? '-' : pile.join(',')).join('|');
     }
 
-    // Note: This matches the provided algorithm exactly
-    function solve(state: SimpleState, visited = new Set<string>(), path: {from: number, to: number}[] = []): {from: number, to: number}[] | null {
-      if (isGoal(state)) return path;
+    // Iterative breadth-first search
+    function solve(initialState: SimpleState): Move[] | null {
+      const queue: Array<{state: SimpleState, path: Move[]}> = [{
+        state: initialState,
+        path: []
+      }];
+      const visited = new Set<string>();
+      const maxDepth = 100; // Prevent infinite search
 
-      const key = stateToString(state);
-      if (visited.has(key)) return null;
-      visited.add(key);
+      while (queue.length > 0) {
+        const {state, path} = queue.shift()!;
 
-      for (const move of getValidMoves(state)) {
-        const nextState = applyMove(state, move);
-        const result = solve(nextState, visited, [...path, move]);
-        if (result) return result;
+        if (path.length > maxDepth) {
+          console.log("Exceeded max depth, skipping state");
+          continue;
+        }
+
+        if (isGoal(state)) {
+          console.log("Found solution with", path.length, "moves");
+          return path;
+        }
+
+        const stateKey = stateToString(state);
+        if (visited.has(stateKey)) continue;
+        visited.add(stateKey);
+
+        // Get and prioritize moves that complete sets
+        const moves = getValidMoves(state).sort((a, b) => {
+          const stateA = applyMove(state, a);
+          const stateB = applyMove(state, b);
+          // Prioritize moves that create complete sets
+          const completeA = stateA[a.to].length === 4;
+          const completeB = stateB[b.to].length === 4;
+          return Number(completeB) - Number(completeA);
+        });
+
+        for (const move of moves) {
+          const nextState = applyMove(state, move);
+          queue.push({
+            state: nextState,
+            path: [...path, move]
+          });
+        }
       }
 
       return null;
