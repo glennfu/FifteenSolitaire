@@ -32,13 +32,13 @@ function shuffleDeck(): Card[] {
       }
     });
   });
-  
+
   // Fisher-Yates shuffle
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
-  
+
   return deck;
 }
 
@@ -55,7 +55,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     const piles = Array(15).fill(null).map((_, index) => ({
       id: index,
       cards: [],
-      isEmpty: index === 6 || index === 9
+      isEmpty: (index + 1) === 6 || (index + 1) === 10
     }));
 
     // Distribute cards to non-empty piles
