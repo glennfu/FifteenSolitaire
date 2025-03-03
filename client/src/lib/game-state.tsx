@@ -193,31 +193,33 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       return piles.map(pile => pile.cards.map(card => card.value));
     }
 
-    function canMove(fromPile: SimplePile, toPile: SimplePile): boolean {
-      if (fromPile.length === 0) return false;
-      if (toPile.length === 0) return true;
-      if (toPile.length >= 4) return false;
-      return toPile[toPile.length - 1] === fromPile[fromPile.length - 1];
-    }
-
     function getValidMoves(state: SimpleState): Move[] {
       const moves: Move[] = [];
 
       for (let from = 0; from < state.length; from++) {
         if (state[from].length === 0) continue;
+        const fromValue = state[from][state[from].length - 1];
 
         for (let to = 0; to < state.length; to++) {
           if (from === to) continue;
 
-          if (canMove(state[from], state[to])) {
-            // Double check with game's validation
-            if (validateMove(from, to)) {
+          // Can always move to empty pile
+          if (state[to].length === 0) {
+            moves.push({ from, to });
+            continue;
+          }
+
+          // Can only stack on matching values when pile isn't full
+          if (state[to].length < 4) {
+            const toValue = state[to][state[to].length - 1];
+            if (toValue === fromValue) {
               moves.push({ from, to });
             }
           }
         }
       }
 
+      console.log(`Found ${moves.length} valid moves`);
       return moves;
     }
 
@@ -232,9 +234,10 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       let completePiles = 0;
       for (const pile of state) {
         if (pile.length === 0) continue;
-        if (pile.length !== 4) return false;
-        if (!pile.every(v => v === pile[0])) return false;
-        completePiles++;
+        if (pile.length !== 4) continue;
+        if (pile.every(v => v === pile[0])) {
+          completePiles++;
+        }
       }
       return completePiles === 13;
     }
@@ -251,10 +254,13 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       visited = new Set<string>(),
       path: Move[] = []
     ): Promise<Move[] | null> {
-      // Add progress logging
+      const stateKey = stateToString(state);
+      if (visited.has(stateKey)) return null;
+      visited.add(stateKey);
+
       if (path.length % 100 === 0) {
-        console.log("Search depth:", path.length, "Visited states:", visited.size);
-        await sleep(0); // Prevent browser freeze
+        console.log(`Search depth: ${path.length}, States visited: ${visited.size}`);
+        await sleep(0);
       }
 
       if (isWinningState(state)) {
@@ -262,26 +268,28 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         return path;
       }
 
-      const stateKey = stateToString(state);
-      if (visited.has(stateKey)) return null;
-      visited.add(stateKey);
+      const moves = getValidMoves(state);
+      console.log(`Depth ${path.length}: Trying ${moves.length} moves`);
 
-      // Get and sort moves by priority
-      const moves = getValidMoves(state).sort((a, b) => {
+      // Sort moves by priority - prefer moves that complete sets
+      moves.sort((a, b) => {
         const stateA = applyMove(state, a);
         const stateB = applyMove(state, b);
-        // Prioritize moves that create complete sets
         const completeA = stateA[a.to].length === 4;
         const completeB = stateB[b.to].length === 4;
         return Number(completeB) - Number(completeA);
       });
 
       for (const move of moves) {
+        // Verify move is valid in the actual game state
+        if (!validateMove(move.from, move.to)) {
+          console.log(`Invalid move: ${move.from} -> ${move.to}`);
+          continue;
+        }
+
         const nextState = applyMove(state, move);
         const solution = await findSolution(nextState, visited, [...path, move]);
-        if (solution !== null) {
-          return solution;
-        }
+        if (solution) return solution;
       }
 
       return null;
@@ -294,17 +302,11 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     const solution = await findSolution(initialState);
 
     if (solution) {
-      console.log("Solution found!");
-      // Verify and execute each move
+      console.log("Solution found! Executing moves...");
       for (const move of solution) {
-        console.log("Attempting move:", move);
-        if (validateMove(move.from, move.to)) {
-          makeMove(move.from);
-          await sleep(300);
-        } else {
-          console.log("Invalid move detected:", move);
-          break;
-        }
+        console.log(`Executing move: ${move.from} -> ${move.to}`);
+        makeMove(move.from);
+        await sleep(300);
       }
     } else {
       console.log("No solution found");
