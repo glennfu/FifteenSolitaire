@@ -30,8 +30,8 @@ export default function Game() {
     <div className="fixed inset-0 flex flex-col bg-background p-4">
       <div className="flex-1 flex items-center justify-center overflow-hidden">
         <div className="w-full">
-          <h1 className="text-2xl font-bold text-center mb-4">Fifteen</h1>
-          <p className="text-sm text-muted-foreground text-center mb-8">
+          <h1 className="text-2xl font-bold text-center">Fifteen</h1>
+          <p className="text-sm text-muted-foreground text-center">
             Games Won: {state.gamesWon}
           </p>
           <Board />
