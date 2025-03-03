@@ -352,7 +352,12 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     // Start solving
     console.log("\nStarting solve...");
     const initialState = toSimpleState();
-    console.log("Initial state:", initialState);
+    console.log("initial_state = [");
+    initialState.forEach((pile, index) => {
+      const pileStr = pile.length === 0 ? '    []' : `    [${pile.join(', ')}]`;
+      console.log(index === initialState.length - 1 ? `${pileStr}` : `${pileStr},`);
+    });
+    console.log("]");
 
     const solution = await dfs(initialState);
 
