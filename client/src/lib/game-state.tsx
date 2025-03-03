@@ -162,31 +162,67 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       const fromPile = prev.piles[pileId];
       if (!fromPile || fromPile.cards.length === 0) return prev;
 
-      const validMove = prev.piles.findIndex((pile, index) => 
-        index !== pileId && validateMove(pileId, index)
-      );
+      // Get all valid moves for this pile
+      const validMoves = prev.piles
+        .map((pile, index) => ({ pile, index }))
+        .filter(({ pile, index }) => index !== pileId && validateMove(pileId, index))
+        .sort((a, b) => {
+          // Priority 1: Non-empty piles with matching rank
+          const aHasMatchingRank = a.pile.cards.length > 0 && 
+                                 a.pile.cards[a.pile.cards.length - 1].value === fromPile.cards[fromPile.cards.length - 1].value;
+          const bHasMatchingRank = b.pile.cards.length > 0 && 
+                                 b.pile.cards[b.pile.cards.length - 1].value === fromPile.cards[fromPile.cards.length - 1].value;
 
-      if (validMove === -1) return prev;
+          if (aHasMatchingRank !== bHasMatchingRank) {
+            return aHasMatchingRank ? -1 : 1;
+          }
 
-      const newPiles = [...prev.piles];
+          // Priority 2: Empty piles - prefer nearest (by index distance)
+          if (a.pile.cards.length === 0 && b.pile.cards.length === 0) {
+            const aDistance = Math.abs(a.index - pileId);
+            const bDistance = Math.abs(b.index - pileId);
+            return aDistance - bDistance;
+          }
+
+          return 0;
+        });
+
+      if (validMoves.length === 0) return prev;
+
+      // Find the next valid move after the last one in history
+      let moveIndex = 0;
+      if (prev.moveHistory.length > 0) {
+        const lastMove = prev.moveHistory[prev.moveHistory.length - 1];
+        if (lastMove.fromPile === pileId) {
+          // Find the index of the last target pile in our valid moves
+          const lastIndex = validMoves.findIndex(({ index }) => index === lastMove.toPile);
+          if (lastIndex !== -1) {
+            // Take the next move in the sequence
+            moveIndex = (lastIndex + 1) % validMoves.length;
+          }
+        }
+      }
+
+      const targetMove = validMoves[moveIndex];
       const movingCard = fromPile.cards[fromPile.cards.length - 1];
 
       // Remove card from source pile
+      const newPiles = [...prev.piles];
       newPiles[pileId] = {
         ...fromPile,
         cards: fromPile.cards.slice(0, -1)
       };
 
       // Add card to target pile
-      newPiles[validMove] = {
-        ...newPiles[validMove],
-        cards: [...newPiles[validMove].cards, movingCard]
+      newPiles[targetMove.index] = {
+        ...newPiles[targetMove.index],
+        cards: [...newPiles[targetMove.index].cards, movingCard]
       };
 
       // Record move in history
       const newHistory = [...prev.moveHistory, {
         fromPile: pileId,
-        toPile: validMove,
+        toPile: targetMove.index,
         card: movingCard
       }];
 
