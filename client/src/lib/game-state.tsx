@@ -213,91 +213,98 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const solve = useCallback(async () => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Convert to a simpler state representation using just card values
-    type SimpleState = {
-      piles: number[][],
-      completeSets: number
-    };
+    // Simple state with just ranks (card values)
+    type Pile = number[];
+    type State = Pile[];
+    type Move = { from: number, to: number };
 
-    function getSimpleState(): SimpleState {
-      const piles = state.piles.map(pile => pile.cards.map(card => card.value));
-      const completeSets = piles.filter(pile => 
-        pile.length === 4 && pile.every(v => v === pile[0])
-      ).length;
-      return { piles, completeSets };
+    function isGoal(state: State): boolean {
+      let completePiles = 0;
+      for (const pile of state) {
+        if (pile.length === 0) continue;
+        if (pile.length !== 4) return false;
+        if (!pile.every(r => r === pile[0])) return false;
+        completePiles++;
+      }
+      return completePiles === 13;
     }
 
-    function findBestMove(piles: number[][]): {from: number, to: number} | null {
-      // First priority: Complete a set
-      for (let from = 0; from < piles.length; from++) {
-        if (piles[from].length === 0) continue;
-        const value = piles[from][piles[from].length - 1];
+    function getValidMoves(state: State): Move[] {
+      const moves: Move[] = [];
+      for (let i = 0; i < state.length; i++) {
+        if (state[i].length === 0) continue;
+        const card = state[i][state[i].length - 1];
 
-        for (let to = 0; to < piles.length; to++) {
-          if (from === to) continue;
-
-          if (piles[to].length > 0 && piles[to].length < 4) {
-            if (piles[to][0] === value) {
-              return { from, to };
+        for (let j = 0; j < state.length; j++) {
+          if (i === j) continue;
+          if (state[j].length === 0) {
+            moves.push({ from: i, to: j });
+          } else {
+            const top = state[j][state[j].length - 1];
+            if (top === card && state[j].length < 4) {
+              moves.push({ from: i, to: j });
             }
           }
         }
       }
+      return moves;
+    }
 
-      // Second priority: Move to empty pile if we have matching cards elsewhere
-      for (let from = 0; from < piles.length; from++) {
-        if (piles[from].length === 0) continue;
-        const value = piles[from][piles[from].length - 1];
+    function applyMove(state: State, move: Move): State {
+      const newState = state.map(pile => [...pile]);
+      const card = newState[move.from].pop()!;
+      newState[move.to].push(card);
+      return newState;
+    }
 
-        for (let to = 0; to < piles.length; to++) {
-          if (from === to || piles[to].length > 0) continue;
+    function stateToString(state: State): string {
+      return state.map(pile => pile.map(r => r.toString()).join(",")).join("|");
+    }
 
-          // Check if there are other piles with this value
-          const hasMatches = piles.some((pile, i) => 
-            i !== from && i !== to && 
-            pile.length > 0 && pile[pile.length - 1] === value
-          );
+    async function findSolution(
+      state: State,
+      visited = new Set<string>(),
+      path: Move[] = []
+    ): Promise<Move[] | null> {
+      if (isGoal(state)) return path;
 
-          if (hasMatches) {
-            return { from, to };
-          }
-        }
+      const key = stateToString(state);
+      if (visited.has(key)) return null;
+      visited.add(key);
+
+      for (const move of getValidMoves(state)) {
+        const nextState = applyMove(state, move);
+        const result = await findSolution(nextState, visited, [...path, move]);
+        if (result) return result;
+        await sleep(1); // Prevent UI freeze
       }
 
       return null;
     }
 
-    let moveCount = 0;
-    const maxMoves = 100; // Prevent infinite loops
-    let currentState = getSimpleState();
+    // Convert game state to simple state
+    const simpleState: State = state.piles.map(pile =>
+      pile.cards.map(card => card.value)
+    );
 
-    console.log("Starting solve...");
-    while (moveCount < maxMoves && currentState.completeSets < 13) {
-      const move = findBestMove(currentState.piles);
-      if (!move) {
-        console.log("No valid moves found");
-        break;
+    console.log("Starting solve with state:", simpleState);
+    const solution = await findSolution(simpleState);
+
+    if (solution) {
+      console.log("Solution found:", solution);
+      for (const move of solution) {
+        if (validateMove(move.from, move.to)) {
+          makeMove(move.from);
+          await sleep(300); // Animation delay
+        } else {
+          console.log("Invalid move found in solution:", move);
+          break;
+        }
       }
-
-      // Verify move is valid in actual game state
-      if (validateMove(move.from, move.to)) {
-        console.log(`Making move: ${move.from} -> ${move.to}`);
-        makeMove(move.from);
-        await sleep(300);
-        moveCount++;
-        currentState = getSimpleState();
-      } else {
-        console.log("Move validation failed");
-        break;
-      }
-    }
-
-    if (currentState.completeSets === 13) {
-      console.log("Solved successfully!");
     } else {
-      console.log("Could not find solution");
+      console.log("No solution found");
     }
-  }, [state, makeMove, validateMove]);
+  }, [state.piles, makeMove, validateMove]);
 
   // Save state to localStorage whenever it changes
   useCallback(() => {
