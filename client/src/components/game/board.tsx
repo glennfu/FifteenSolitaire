@@ -6,11 +6,12 @@ export function Board() {
 
   return (
     <div 
-      className="w-full max-w-3xl mx-auto grid grid-cols-5 grid-rows-3 gap-2" 
+      className="w-full max-w-3xl mx-auto grid grid-cols-5 gap-2" 
       style={{ 
         userSelect: "none",
-        // Each pile needs about 8rem height (considering card height + stacking)
-        gridTemplateRows: "8rem 8rem 8rem"
+        // Increase row height to accommodate stacked cards (6rem card + 2rem stacking space)
+        gridTemplateRows: "repeat(3, minmax(8rem, 1fr))",
+        paddingTop: "2rem" // Add some space from top
       }}
     >
       {/* First row - 5 piles */}
