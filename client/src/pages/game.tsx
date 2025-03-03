@@ -40,21 +40,22 @@ export default function Game() {
   }, [initGame]);
 
   return (
-    <div className="fixed inset-0 bg-background overflow-auto">
-      <div className="min-h-[calc(100vh-4rem)] flex flex-col p-4">
-        <div className="flex-grow">
-          <Board />
-        </div>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Main game area */}
+      <div className="flex-1 p-4 overflow-y-auto">
+        <Board />
 
+        {/* Debug panel */}
         {state.debugMode && (
-          <div className="mt-4 mb-16">
+          <div className="mt-4">
             <DebugPanel />
           </div>
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background">
-        <div className="flex justify-between items-center">
+      {/* Footer */}
+      <div className="sticky bottom-0 bg-background border-t p-4">
+        <div className="flex justify-between items-center max-w-3xl mx-auto">
           <Menu />
           <div>
             <h1 className="text-2xl font-bold text-center">Fifteen</h1>
