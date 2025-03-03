@@ -39,11 +39,11 @@ export function Card({ card, onClick, className, disabled }: CardProps) {
         className
       )}
     >
-      <div className="absolute top-1 left-2 flex gap-1">
+      <div className="absolute top-0.5 left-1.5 flex gap-0.5">
         <span className={cn("text-lg font-semibold", suitColor)}>{value}</span>
         <span className={cn("text-lg", suitColor)}>{suitSymbol}</span>
       </div>
-      <div className="absolute bottom-1 right-2 flex gap-1 rotate-180">
+      <div className="absolute bottom-0.5 right-1.5 flex gap-0.5 rotate-180">
         <span className={cn("text-lg font-semibold", suitColor)}>{value}</span>
         <span className={cn("text-lg", suitColor)}>{suitSymbol}</span>
       </div>
