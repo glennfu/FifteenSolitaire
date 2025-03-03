@@ -15,6 +15,7 @@ interface GameContextType {
   loadGame: (state: GameState) => void;
   validateMove: (fromPile: number, toPile: number) => boolean;
   toggleDebug: () => void;
+  solve: () => void;  // New solve function
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -205,6 +206,40 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const solve = useCallback(async () => {
+    setState(prev => {
+      const findNextMove = () => {
+        for (let fromPile = 0; fromPile < prev.piles.length; fromPile++) {
+          for (let toPile = 0; toPile < prev.piles.length; toPile++) {
+            if (fromPile !== toPile && validateMove(fromPile, toPile)) {
+              return { fromPile, toPile };
+            }
+          }
+        }
+        return null;
+      };
+
+      const executeMove = async () => {
+        const move = findNextMove();
+        if (!move) return;
+
+        // Add delay for animation
+        await new Promise(resolve => setTimeout(resolve, 100));
+        makeMove(move.fromPile);
+      };
+
+      // Start solving process
+      const solveLoop = async () => {
+        while (findNextMove()) {
+          await executeMove();
+        }
+      };
+
+      solveLoop();
+      return prev;
+    });
+  }, [validateMove, makeMove]);
+
   // Save state to localStorage whenever it changes
   useCallback(() => {
     localStorage.setItem("gameState", JSON.stringify(state));
@@ -219,7 +254,8 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         initGame,
         loadGame,
         validateMove,
-        toggleDebug
+        toggleDebug,
+        solve  // Add solve to context
       }}
     >
       {children}

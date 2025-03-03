@@ -41,11 +41,13 @@ export function Card({ card, onClick, className, disabled }: CardProps) {
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-[4.5rem] h-[6rem] rounded-lg shadow-md border-2",
+        "w-[4.5rem] h-[6rem] rounded-lg border-2",
         "relative",
-        "transition-transform hover:scale-105 active:scale-95",
+        "transition-all duration-100",
         "bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700",
-        disabled ? "opacity-75" : "opacity-100",
+        "hover:scale-105 active:scale-95",
+        "shadow-sm hover:shadow-md",
+        disabled && "opacity-75 hover:scale-100 active:scale-100",
         className
       )}
     >

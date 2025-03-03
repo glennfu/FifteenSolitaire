@@ -9,7 +9,7 @@ import { Menu as MenuIcon } from "lucide-react";
 import { useGameState } from "@/lib/game-state";
 
 export function Menu() {
-  const { initGame, state, toggleDebug } = useGameState();
+  const { initGame, state, toggleDebug, solve } = useGameState();
 
   return (
     <DropdownMenu>
@@ -21,6 +21,9 @@ export function Menu() {
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={() => initGame()}>
           New Game
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => solve()}>
+          Solve
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => toggleDebug()}>
           {state.debugMode ? "Disable Debug Mode" : "Enable Debug Mode"}
