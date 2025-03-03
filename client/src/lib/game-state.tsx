@@ -82,14 +82,16 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     const piles = Array(15).fill(null).map((_, index) => ({
       id: index,
       cards: [],
-      isEmpty: false
+      isEmpty: index === 5 || index === 9 // Piles 6 and 10 (0-based index)
     }));
 
-    // Distribute cards to piles
+    // Distribute cards to non-empty piles
     let cardIndex = 0;
     piles.forEach((pile) => {
-      pile.cards = deck.slice(cardIndex, cardIndex + 4);
-      cardIndex += 4;
+      if (!pile.isEmpty) {
+        pile.cards = deck.slice(cardIndex, cardIndex + 4);
+        cardIndex += 4;
+      }
     });
 
     setState(prev => ({
@@ -211,104 +213,91 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const solve = useCallback(async () => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Get top card value from a pile, or null if empty
-    function getTopValue(pile: GamePile): CardValue | null {
-      return pile.cards.length > 0 ? pile.cards[pile.cards.length - 1].value : null;
+    // Convert to a simpler state representation using just card values
+    type SimpleState = {
+      piles: number[][],
+      completeSets: number
+    };
+
+    function getSimpleState(): SimpleState {
+      const piles = state.piles.map(pile => pile.cards.map(card => card.value));
+      const completeSets = piles.filter(pile => 
+        pile.length === 4 && pile.every(v => v === pile[0])
+      ).length;
+      return { piles, completeSets };
     }
 
-    // Create a simpler state representation for solving
-    function toSimpleState(piles: GamePile[]): number[][] {
-      return piles.map(pile => 
-        pile.cards.map(card => card.value)
-      );
-    }
+    function findBestMove(piles: number[][]): {from: number, to: number} | null {
+      // First priority: Complete a set
+      for (let from = 0; from < piles.length; from++) {
+        if (piles[from].length === 0) continue;
+        const value = piles[from][piles[from].length - 1];
 
-    function stateToString(state: number[][]): string {
-      return state.map(pile => pile.length === 0 ? '-' : pile.join(',')).join('|');
-    }
+        for (let to = 0; to < piles.length; to++) {
+          if (from === to) continue;
 
-    // Try to find a solution
-    function solve(startState: number[][]): {from: number, to: number}[] | null {
-      const visited = new Set<string>();
-      const stack: Array<{
-        state: number[][],
-        path: {from: number, to: number}[]
-      }> = [{
-        state: startState,
-        path: []
-      }];
-
-      while (stack.length > 0) {
-        const { state, path } = stack.pop()!;
-
-        // Check if this is a winning state
-        let completePiles = 0;
-        let isWinning = true;
-        for (const pile of state) {
-          if (pile.length === 0) continue;
-          if (pile.length !== 4) {
-            isWinning = false;
-            break;
-          }
-          if (!pile.every(v => v === pile[0])) {
-            isWinning = false;
-            break;
-          }
-          completePiles++;
-        }
-
-        if (isWinning && completePiles === 13) {
-          return path;
-        }
-
-        // Skip if we've seen this state
-        const stateKey = stateToString(state);
-        if (visited.has(stateKey)) continue;
-        visited.add(stateKey);
-
-        // Try all possible moves
-        for (let from = 0; from < state.length; from++) {
-          if (state[from].length === 0) continue;
-          const card = state[from][state[from].length - 1];
-
-          for (let to = 0; to < state.length; to++) {
-            if (from === to) continue;
-
-            // Valid moves: to empty pile or matching value with room
-            if (state[to].length === 0 || 
-                (state[to].length < 4 && state[to][state[to].length - 1] === card)) {
-              // Make the move
-              const nextState = state.map(pile => [...pile]);
-              const movedCard = nextState[from].pop()!;
-              nextState[to].push(movedCard);
-
-              stack.push({
-                state: nextState,
-                path: [...path, { from, to }]
-              });
+          if (piles[to].length > 0 && piles[to].length < 4) {
+            if (piles[to][0] === value) {
+              return { from, to };
             }
           }
         }
       }
 
-      return null; // No solution found
+      // Second priority: Move to empty pile if we have matching cards elsewhere
+      for (let from = 0; from < piles.length; from++) {
+        if (piles[from].length === 0) continue;
+        const value = piles[from][piles[from].length - 1];
+
+        for (let to = 0; to < piles.length; to++) {
+          if (from === to || piles[to].length > 0) continue;
+
+          // Check if there are other piles with this value
+          const hasMatches = piles.some((pile, i) => 
+            i !== from && i !== to && 
+            pile.length > 0 && pile[pile.length - 1] === value
+          );
+
+          if (hasMatches) {
+            return { from, to };
+          }
+        }
+      }
+
+      return null;
     }
+
+    let moveCount = 0;
+    const maxMoves = 100; // Prevent infinite loops
+    let currentState = getSimpleState();
 
     console.log("Starting solve...");
-    const simpleState = toSimpleState(state.piles);
-    const solution = solve(simpleState);
-
-    if (solution) {
-      console.log("Solution found:", solution);
-      // Execute the solution
-      for (const move of solution) {
-        makeMove(move.from);
-        await sleep(300); // Animation delay
+    while (moveCount < maxMoves && currentState.completeSets < 13) {
+      const move = findBestMove(currentState.piles);
+      if (!move) {
+        console.log("No valid moves found");
+        break;
       }
-    } else {
-      console.log("No solution found");
+
+      // Verify move is valid in actual game state
+      if (validateMove(move.from, move.to)) {
+        console.log(`Making move: ${move.from} -> ${move.to}`);
+        makeMove(move.from);
+        await sleep(300);
+        moveCount++;
+        currentState = getSimpleState();
+      } else {
+        console.log("Move validation failed");
+        break;
+      }
     }
-  }, [state.piles, makeMove]);
+
+    if (currentState.completeSets === 13) {
+      console.log("Solved successfully!");
+    } else {
+      console.log("Could not find solution");
+    }
+  }, [state, makeMove, validateMove]);
 
   // Save state to localStorage whenever it changes
   useCallback(() => {
