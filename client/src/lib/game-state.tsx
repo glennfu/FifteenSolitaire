@@ -167,65 +167,78 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       const fromPile = prev.piles[pileId];
       if (!fromPile || fromPile.cards.length === 0) return prev;
 
-      let validMoves: { fromPile: number; toPile: number }[] = [];
       let moveIndex = 0;
+      let validMoves: { fromPile: number; toPile: number }[] = [];
 
-      // If this is a different card than last time, recompute all valid moves
-      if (pileId !== prev.selectedPile) {
+      // Computing new valid moves if:
+      // 1. Selecting a different pile than before
+      // 2. No valid moves exist yet
+      if (pileId !== prev.selectedPile || prev.validMoves.length === 0) {
         const movingCard = fromPile.cards[fromPile.cards.length - 1];
         const matchingPiles: number[] = [];
         const emptyPiles: number[] = [];
 
-        // First collect all valid destinations
+        // Gather all valid destinations
         prev.piles.forEach((pile, index) => {
-          // Skip invalid destinations
-          if (pile.cards.length >= 4) return;
+          if (index === pileId) return; // Skip source pile
 
-          // Categorize valid destinations
+          // Check for valid empty piles
           if (pile.cards.length === 0) {
             emptyPiles.push(index);
-          } else if (pile.cards[pile.cards.length - 1].value === movingCard.value) {
-            matchingPiles.push(index);
+          }
+          // Check for valid matching piles
+          else if (pile.cards.length < 4) {
+            const topCard = pile.cards[pile.cards.length - 1];
+            if (topCard.value === movingCard.value) {
+              matchingPiles.push(index);
+            }
           }
         });
 
-        // Sort empty piles by proximity to source
+        // Sort empty piles by proximity
         emptyPiles.sort((a, b) => Math.abs(a - pileId) - Math.abs(b - pileId));
 
-        // Build ordered moves list - matching piles first, then empty piles
+        // Create ordered list of moves
         validMoves = [
           ...matchingPiles.map(toPile => ({ fromPile: pileId, toPile })),
-          ...emptyPiles.map(toPile => ({ fromPile: pileId, toPile })),
-          // Include current pile at the end to complete the cycle
-          { fromPile: pileId, toPile: pileId }
+          ...emptyPiles.map(toPile => ({ fromPile: pileId, toPile }))
         ];
       } else {
-        // Use existing moves list and find next valid move
+        // Use existing valid moves list
         validMoves = prev.validMoves;
 
+        // Find the next move in sequence
         if (prev.moveHistory.length > 0) {
           const lastMove = prev.moveHistory[prev.moveHistory.length - 1];
-          const lastIndex = validMoves.findIndex(move => 
-            move.fromPile === lastMove.fromPile && move.toPile === lastMove.toPile
-          );
-          if (lastIndex !== -1) {
-            moveIndex = (lastIndex + 1) % validMoves.length;
+          if (lastMove.fromPile === pileId) {
+            const lastIndex = validMoves.findIndex(move => move.toPile === lastMove.toPile);
+            if (lastIndex !== -1) {
+              moveIndex = (lastIndex + 1) % validMoves.length;
+            }
           }
         }
       }
 
+      // No valid moves available
       if (validMoves.length === 0) return prev;
 
       const targetMove = validMoves[moveIndex];
 
-      // Don't make a move if it's to the same pile
-      if (targetMove.toPile === pileId && moveIndex === 0) return prev;
+      // Double check the move is still valid
+      const targetPile = prev.piles[targetMove.toPile];
+      if (targetPile.cards.length >= 4) {
+        return {
+          ...prev,
+          selectedPile: null,
+          validMoves: []
+        };
+      }
 
       // Execute the move
       const movingCard = fromPile.cards[fromPile.cards.length - 1];
       const newPiles = [...prev.piles];
 
-      // Remove from source
+      // Remove card from source
       newPiles[pileId] = {
         ...fromPile,
         cards: fromPile.cards.slice(0, -1)
@@ -233,8 +246,8 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
       // Add to target
       newPiles[targetMove.toPile] = {
-        ...newPiles[targetMove.toPile],
-        cards: [...newPiles[targetMove.toPile].cards, movingCard]
+        ...targetPile,
+        cards: [...targetPile.cards, movingCard]
       };
 
       // Check win condition
@@ -246,7 +259,11 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       return {
         ...prev,
         piles: newPiles,
-        moveHistory: [...prev.moveHistory, targetMove],
+        moveHistory: [...prev.moveHistory, {
+          fromPile: pileId,
+          toPile: targetMove.toPile,
+          card: movingCard
+        }],
         gamesWon: hasWon ? prev.gamesWon + 1 : prev.gamesWon,
         gameWon: hasWon,
         selectedPile: pileId,
