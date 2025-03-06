@@ -1,6 +1,6 @@
-import { createContext, useContext, useCallback, useState } from "react";
+import { createContext, useContext, useCallback, useState, useEffect } from "react";
 import {
-  GameState,
+  GameState as GameStateType,
   Card,
   CardSuit,
   CardValue,
@@ -8,11 +8,11 @@ import {
 } from "@shared/schema";
 
 interface GameContextType {
-  state: GameState;
+  state: GameStateType;
   makeMove: (pileId: number) => void;
   undo: () => void;
   initGame: () => void;
-  loadGame: (state: GameState) => void;
+  loadGame: (state: GameStateType) => void;
   validateMove: (fromPile: number, toPile: number) => boolean;
   toggleDebug: () => void;
   solve: () => void;
@@ -247,15 +247,16 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       const newPiles = [...prev.piles];
 
       // Remove card from source
+      const cardToMove = fromPile.cards[fromPile.cards.length - 1];
       newPiles[pileId] = {
         ...fromPile,
         cards: fromPile.cards.slice(0, -1)
       };
 
-      // Add to target
+      // Add to target - use the exact same card object to preserve suit
       newPiles[targetMove.toPile] = {
         ...targetPile,
-        cards: [...targetPile.cards, movingCard]
+        cards: [...targetPile.cards, cardToMove]
       };
 
       // Check win condition
@@ -270,12 +271,12 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         moveHistory: [...prev.moveHistory, {
           fromPile: pileId,
           toPile: targetMove.toPile,
-          card: movingCard
+          card: cardToMove
         }],
         gamesWon: hasWon ? prev.gamesWon + 1 : prev.gamesWon,
         gameWon: hasWon,
         selectedPile: pileId,
-        selectedCardId: movingCard.id,
+        selectedCardId: cardToMove.id,
         validMoves: validMoves
       };
     });
@@ -314,7 +315,13 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const loadGame = useCallback((savedState: GameState) => {
     const parsed = gameStateSchema.safeParse(savedState);
     if (parsed.success) {
-      setState(parsed.data);
+      setState({
+        ...parsed.data,
+        gameWon: parsed.data.gameWon || false,
+        selectedPile: parsed.data.selectedPile || null,
+        selectedCardId: parsed.data.selectedCardId || null,
+        validMoves: parsed.data.validMoves || []
+      });
     } else {
       throw new Error("Invalid game state");
     }
@@ -375,7 +382,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   }, [state.piles, makeMove]);
 
   // Save state to localStorage whenever it changes
-  useCallback(() => {
+  useEffect(() => {
     localStorage.setItem("gameState", JSON.stringify(state));
   }, [state]);
 
