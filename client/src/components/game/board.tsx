@@ -6,6 +6,10 @@ export function Board() {
   const { state, makeMove } = useGameState();
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 });
   const boardRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [gridWidth, setGridWidth] = useState(0);
+  const [verticalSpacing, setVerticalSpacing] = useState(0);
+  const [initialCalculationDone, setInitialCalculationDone] = useState(false);
 
   // Calculate optimal card size based on viewport
   useEffect(() => {
@@ -14,50 +18,46 @@ export function Board() {
                       !(/OS 1[3-9]/.test(navigator.userAgent)); // iOS 12 or lower
     
     const calculateCardSize = () => {
-      // Get the actual board element height instead of relying on vh units
-      const boardElement = boardRef.current;
-      if (!boardElement) return;
+      // Use the container width instead of the board width to break the feedback loop
+      const containerElement = containerRef.current;
+      if (!containerElement) return;
       
-      const boardRect = boardElement.getBoundingClientRect();
-      const boardWidth = boardRect.width;
+      const containerRect = containerElement.getBoundingClientRect();
+      const availableWidth = containerRect.width;
       
       // Adjust footer height based on device
       const footerHeight = isOlderIOS ? 120 : 96; // 7.5rem for older iOS, 6rem for others
-      const boardHeight = Math.min(
-        boardRect.height, 
+      const availableHeight = Math.min(
+        containerRect.height, 
         window.innerHeight - footerHeight
       );
       
       // Add safety margin based on device
       const safetyMargin = isOlderIOS ? 30 : 10;
-      const adjustedBoardHeight = boardHeight - safetyMargin;
+      const adjustedHeight = availableHeight - safetyMargin;
       
       // Calculate gap sizes - different for older iOS vs modern devices
-      let gapSize;
+      let horizontalGapSize, verticalGapSize;
       if (isOlderIOS) {
         // For older iOS: use smaller horizontal gaps and slightly larger vertical gaps
-        const horizontalGapSize = Math.min(10, boardWidth * 0.012);
-        document.documentElement.style.setProperty('--horizontal-gap', `${horizontalGapSize}px`);
-        
-        const verticalGapSize = Math.min(12, boardHeight * 0.015);
-        document.documentElement.style.setProperty('--vertical-gap', `${verticalGapSize}px`);
-        
-        gapSize = horizontalGapSize; // Use horizontal gap size for card width calculation
+        horizontalGapSize = Math.min(10, availableWidth * 0.012);
+        verticalGapSize = Math.min(12, availableHeight * 0.015);
       } else {
         // For modern devices: keep the original gap calculation
-        gapSize = Math.min(16, Math.min(boardWidth, adjustedBoardHeight) * 0.02);
-        // Use the same gap for both horizontal and vertical on modern devices
-        document.documentElement.style.setProperty('--horizontal-gap', `${gapSize}px`);
-        document.documentElement.style.setProperty('--vertical-gap', `${gapSize}px`);
+        horizontalGapSize = Math.min(16, Math.min(availableWidth, adjustedHeight) * 0.02);
+        verticalGapSize = horizontalGapSize; // Start with the same gap for both
       }
       
+      document.documentElement.style.setProperty('--horizontal-gap', `${horizontalGapSize}px`);
+      document.documentElement.style.setProperty('--vertical-gap', `${verticalGapSize}px`);
+      
       // Calculate maximum card dimensions that would fit in the grid
-      const maxCardWidth = (boardWidth - (gapSize * 4)) / 5;
+      const maxCardWidth = (availableWidth - (horizontalGapSize * 4)) / 5;
       
       // For height: account for 3 rows with stacking
       // Adjust stacking factor based on device
       const stackingFactor = isOlderIOS ? 1.85 : 1.75; // Slightly reduced for older iOS
-      const maxCardHeight = (adjustedBoardHeight - (gapSize * 2)) / (3 * stackingFactor);
+      const maxCardHeight = (adjustedHeight - (verticalGapSize * 2)) / (3 * stackingFactor);
       
       // Card should maintain a 3:4 aspect ratio (width:height)
       const idealAspectRatio = 3/4;
@@ -76,20 +76,76 @@ export function Board() {
       
       // Apply safety factor based on device - keep original for modern devices
       const safetyFactor = isOlderIOS ? 0.9 : 0.92;
+      const finalCardWidth = finalWidth * safetyFactor;
+      const finalCardHeight = finalHeight * safetyFactor;
+      
       setCardSize({
-        width: finalWidth * safetyFactor,
-        height: finalHeight * safetyFactor
+        width: finalCardWidth,
+        height: finalCardHeight
       });
+      
+      // Calculate the exact grid width based on card size and gaps
+      const exactGridWidth = (finalCardWidth * 5) + (horizontalGapSize * 4);
+      setGridWidth(exactGridWidth);
+      
+      // Calculate the total height used by cards
+      const totalCardHeight = (finalCardHeight * 3 * stackingFactor);
+      
+      // Calculate remaining space and distribute it as vertical spacing
+      const remainingSpace = adjustedHeight - totalCardHeight;
+      
+      // If we have extra space, distribute it between the rows
+      if (remainingSpace > verticalGapSize * 2) {
+        // Calculate how much space we can use for vertical spacing
+        // We need to distribute this across 2 gaps between rows
+        
+        // For skinny layouts (when width is the limiting factor), use more vertical space
+        const isSkinnyLayout = heightFromWidth > maxCardHeight;
+        
+        if (isSkinnyLayout) {
+          // For skinny layouts, use more vertical space - up to 25% of available height
+          const maxSpacing = Math.min(
+            Math.floor(remainingSpace / 2), // Divide by 2 for the two gaps
+            availableHeight * 0.25 // Allow up to 25% of available height
+          );
+          setVerticalSpacing(maxSpacing);
+        } else {
+          // For wider layouts, be more conservative
+          const maxSpacing = Math.min(
+            Math.floor(remainingSpace / 3), // Divide by 3 (2 gaps + extra padding)
+            availableHeight * 0.1, // Cap at 10% of available height
+            40 // Or 40px, whichever is smaller
+          );
+          setVerticalSpacing(maxSpacing);
+        }
+      } else {
+        // Use the default vertical gap
+        setVerticalSpacing(verticalGapSize);
+      }
+      
+      setInitialCalculationDone(true);
     };
 
     // Initial calculation
     calculateCardSize();
     
-    // Recalculate on resize
-    window.addEventListener('resize', calculateCardSize);
+    // Recalculate on resize, but only if the window size actually changes significantly
+    let lastWidth = window.innerWidth;
+    let lastHeight = window.innerHeight;
     
-    // Recalculate after a short delay to ensure DOM is fully rendered
-    const timeoutId = setTimeout(calculateCardSize, 500);
+    const handleResize = () => {
+      // Only recalculate if the window size changes by more than 5%
+      const widthChange = Math.abs(window.innerWidth - lastWidth) / lastWidth;
+      const heightChange = Math.abs(window.innerHeight - lastHeight) / lastHeight;
+      
+      if (widthChange > 0.05 || heightChange > 0.05) {
+        lastWidth = window.innerWidth;
+        lastHeight = window.innerHeight;
+        calculateCardSize();
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
     
     // Also recalculate on orientation change which is important for mobile
     window.addEventListener('orientationchange', () => {
@@ -98,9 +154,8 @@ export function Board() {
     });
     
     return () => {
-      window.removeEventListener('resize', calculateCardSize);
+      window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', calculateCardSize);
-      clearTimeout(timeoutId);
     };
   }, []);
 
@@ -110,119 +165,148 @@ export function Board() {
 
   return (
     <div 
-      ref={boardRef}
-      className={isOlderIOS ? "game-board w-full mx-auto" : "game-board w-full mx-auto grid grid-cols-5 gap-[2vmin] p-[2vmin]"}
-      style={isOlderIOS ? { 
-        userSelect: "none",
-        height: "calc(100vh - 7.5rem)",
-        maxHeight: "calc(100vh - 120px)",
-        overflow: "hidden",
-        display: "grid",
-        gridTemplateRows: "repeat(3, auto)",
-        gap: "var(--vertical-gap, 12px)",
-        padding: "var(--vertical-gap, 12px) var(--horizontal-gap, 10px)"
-      } : {
-        userSelect: "none",
-        height: "calc(100vh - 6rem)",
-        overflow: "hidden"
+      ref={containerRef}
+      className="flex justify-center items-start w-full h-full"
+      style={{
+        height: isOlderIOS ? "calc(100vh - 7.5rem)" : "calc(100vh - 6rem)",
       }}
     >
-      {isOlderIOS ? (
-        <>
-          <div 
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: "var(--horizontal-gap, 10px)"
-            }}
-          >
-            {state.piles.slice(0, 5).map((pile) => (
-              <Pile
-                key={pile.id}
-                pile={pile}
-                onCardClick={(pileId) => makeMove(pileId)}
-                cardSize={cardSize}
-                isOlderIOS={true}
-              />
-            ))}
-          </div>
+      <div 
+        ref={boardRef}
+        className="game-board mx-auto"
+        style={{ 
+          userSelect: "none",
+          height: "auto", // Use auto height to prevent stretching
+          maxHeight: "100%", // Ensure it doesn't exceed container height
+          overflow: "hidden",
+          width: initialCalculationDone ? `${gridWidth}px` : "95%", // Use percentage width if calculation not done
+          maxWidth: "95vmin",
+          paddingTop: isOlderIOS ? "var(--vertical-gap, 12px)" : "2vmin",
+          paddingBottom: isOlderIOS ? "var(--vertical-gap, 12px)" : "2vmin",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: verticalSpacing > 0 ? "space-between" : "flex-start"
+        }}
+      >
+        {isOlderIOS ? (
+          <>
+            <div 
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, 1fr)",
+                gap: "var(--horizontal-gap, 10px)",
+                marginBottom: verticalSpacing > 0 ? `${verticalSpacing}px` : "var(--vertical-gap, 12px)"
+              }}
+            >
+              {state.piles.slice(0, 5).map((pile) => (
+                <Pile
+                  key={pile.id}
+                  pile={pile}
+                  onCardClick={(pileId) => makeMove(pileId)}
+                  cardSize={cardSize}
+                  isOlderIOS={true}
+                />
+              ))}
+            </div>
 
-          <div 
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: "var(--horizontal-gap, 10px)"
-            }}
-          >
-            {state.piles.slice(5, 10).map((pile) => (
-              <Pile
-                key={pile.id}
-                pile={pile}
-                onCardClick={(pileId) => makeMove(pileId)}
-                cardSize={cardSize}
-                isOlderIOS={true}
-              />
-            ))}
-          </div>
+            <div 
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, 1fr)",
+                gap: "var(--horizontal-gap, 10px)",
+                marginBottom: verticalSpacing > 0 ? `${verticalSpacing}px` : "var(--vertical-gap, 12px)"
+              }}
+            >
+              {state.piles.slice(5, 10).map((pile) => (
+                <Pile
+                  key={pile.id}
+                  pile={pile}
+                  onCardClick={(pileId) => makeMove(pileId)}
+                  cardSize={cardSize}
+                  isOlderIOS={true}
+                />
+              ))}
+            </div>
 
-          <div 
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: "var(--horizontal-gap, 10px)"
-            }}
-          >
-            {state.piles.slice(10, 15).map((pile) => (
-              <Pile
-                key={pile.id}
-                pile={pile}
-                onCardClick={(pileId) => makeMove(pileId)}
-                cardSize={cardSize}
-                isOlderIOS={true}
-              />
-            ))}
-          </div>
-        </>
-      ) : (
-        // Original layout for modern devices
-        <>
-          <div className="col-span-5 grid grid-cols-5 gap-[2vmin]">
-            {state.piles.slice(0, 5).map((pile) => (
-              <Pile
-                key={pile.id}
-                pile={pile}
-                onCardClick={(pileId) => makeMove(pileId)}
-                cardSize={cardSize}
-                isOlderIOS={false}
-              />
-            ))}
-          </div>
+            <div 
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, 1fr)",
+                gap: "var(--horizontal-gap, 10px)"
+              }}
+            >
+              {state.piles.slice(10, 15).map((pile) => (
+                <Pile
+                  key={pile.id}
+                  pile={pile}
+                  onCardClick={(pileId) => makeMove(pileId)}
+                  cardSize={cardSize}
+                  isOlderIOS={true}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          // Original layout for modern devices with fixed width
+          <>
+            <div 
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, 1fr)",
+                gap: "var(--horizontal-gap, 16px)",
+                marginBottom: verticalSpacing > 0 ? `${verticalSpacing}px` : "var(--vertical-gap, 16px)"
+              }}
+            >
+              {state.piles.slice(0, 5).map((pile) => (
+                <Pile
+                  key={pile.id}
+                  pile={pile}
+                  onCardClick={(pileId) => makeMove(pileId)}
+                  cardSize={cardSize}
+                  isOlderIOS={false}
+                />
+              ))}
+            </div>
 
-          <div className="col-span-5 grid grid-cols-5 gap-[2vmin]">
-            {state.piles.slice(5, 10).map((pile) => (
-              <Pile
-                key={pile.id}
-                pile={pile}
-                onCardClick={(pileId) => makeMove(pileId)}
-                cardSize={cardSize}
-                isOlderIOS={false}
-              />
-            ))}
-          </div>
+            <div 
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, 1fr)",
+                gap: "var(--horizontal-gap, 16px)",
+                marginBottom: verticalSpacing > 0 ? `${verticalSpacing}px` : "var(--vertical-gap, 16px)"
+              }}
+            >
+              {state.piles.slice(5, 10).map((pile) => (
+                <Pile
+                  key={pile.id}
+                  pile={pile}
+                  onCardClick={(pileId) => makeMove(pileId)}
+                  cardSize={cardSize}
+                  isOlderIOS={false}
+                />
+              ))}
+            </div>
 
-          <div className="col-span-5 grid grid-cols-5 gap-[2vmin]">
-            {state.piles.slice(10, 15).map((pile) => (
-              <Pile
-                key={pile.id}
-                pile={pile}
-                onCardClick={(pileId) => makeMove(pileId)}
-                cardSize={cardSize}
-                isOlderIOS={false}
-              />
-            ))}
-          </div>
-        </>
-      )}
+            <div 
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, 1fr)",
+                gap: "var(--horizontal-gap, 16px)"
+              }}
+            >
+              {state.piles.slice(10, 15).map((pile) => (
+                <Pile
+                  key={pile.id}
+                  pile={pile}
+                  onCardClick={(pileId) => makeMove(pileId)}
+                  cardSize={cardSize}
+                  isOlderIOS={false}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
