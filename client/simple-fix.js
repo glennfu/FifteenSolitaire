@@ -7,7 +7,10 @@ import http from 'http';
 import https from 'https';
 import { createServer } from 'http';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Get the directory name in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const projectRoot = path.resolve(__dirname, '..');
 
 console.log('Building and fixing standalone version...');
@@ -317,7 +320,7 @@ async function applyStyles() {
     console.log('Using minimal CSS variables as fallback');
     cssContent = `
       :root {
-        --radius: 0.5rem;
+        --radius: 1rem;
       }
       
       @media (prefers-color-scheme: dark) {
@@ -351,4 +354,38 @@ async function applyStyles() {
 applyStyles().catch(error => {
   console.error('Error applying styles:', error);
   process.exit(1);
-}); 
+});
+
+// Copy necessary files for PWA
+const publicDir = path.join(__dirname, 'public');
+const buildDir = path.join(__dirname, 'dist');
+
+// Ensure build directory exists
+if (!fs.existsSync(buildDir)) {
+  fs.mkdirSync(buildDir, { recursive: true });
+}
+
+// Copy service worker
+fs.copyFileSync(
+  path.join(publicDir, 'service-worker.js'),
+  path.join(buildDir, 'service-worker.js')
+);
+
+// Copy manifest
+fs.copyFileSync(
+  path.join(publicDir, 'manifest.json'),
+  path.join(buildDir, 'manifest.json')
+);
+
+// Copy icons if they exist
+const iconFiles = ['icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
+iconFiles.forEach(icon => {
+  const sourcePath = path.join(publicDir, icon);
+  if (fs.existsSync(sourcePath)) {
+    fs.copyFileSync(sourcePath, path.join(buildDir, icon));
+  } else {
+    console.warn(`Warning: ${icon} not found in public directory`);
+  }
+});
+
+console.log("Build completed successfully!"); 

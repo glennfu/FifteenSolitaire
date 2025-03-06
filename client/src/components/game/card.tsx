@@ -1,14 +1,54 @@
 import { Card as CardType, CardSuit, CardValue } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 
 interface CardProps {
   card: CardType;
   onClick?: () => void;
   className?: string;
   disabled?: boolean;
+  width: number;
+  height: number;
+  isOlderIOS?: boolean;
 }
 
-export function Card({ card, onClick, className, disabled }: CardProps) {
+export function Card({ card, onClick, className, disabled, width, height, isOlderIOS = false }: CardProps) {
+  const [styles, setStyles] = useState({
+    fontSize: 18,
+    paddingTop: 4,
+    paddingLeft: 4,
+    borderRadius: 5,
+    borderWidth: 1
+  });
+  
+  // Calculate styles when dimensions change
+  useEffect(() => {
+    if (width > 0 && height > 0) {
+      // Font size: adjust based on device
+      const fontSizePercent = isOlderIOS ? 0.22 : 0.25;
+      const calculatedFontSize = Math.max(isOlderIOS ? 12 : 14, Math.min(isOlderIOS ? 30 : 36, width * fontSizePercent));
+      
+      // Padding: adjust based on device
+      const paddingTopPercent = 0.04;
+      const paddingLeftPercent = isOlderIOS ? 0.04 : 0.05;
+      const calculatedPaddingTop = Math.max(2, Math.min(10, height * paddingTopPercent));
+      const calculatedPaddingLeft = Math.max(isOlderIOS ? 2 : 3, Math.min(10, width * paddingLeftPercent));
+      
+      // Border properties
+      const borderRadiusPercent = isOlderIOS ? 0.03 : 0.04;
+      const calculatedBorderRadius = Math.max(isOlderIOS ? 4 : 6, Math.min(isOlderIOS ? 10 : 12, width * borderRadiusPercent));
+      const calculatedBorderWidth = Math.max(1, Math.min(2, width * 0.008));
+      
+      setStyles({
+        fontSize: calculatedFontSize,
+        paddingTop: calculatedPaddingTop,
+        paddingLeft: calculatedPaddingLeft,
+        borderRadius: calculatedBorderRadius,
+        borderWidth: calculatedBorderWidth
+      });
+    }
+  }, [width, height, isOlderIOS]);
+
   const suitColor = card.suit === CardSuit.Hearts || card.suit === CardSuit.Diamonds
     ? "text-red-500 dark:text-red-400"
     : "text-slate-900 dark:text-slate-100";
@@ -41,8 +81,7 @@ export function Card({ card, onClick, className, disabled }: CardProps) {
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-[4.5rem] h-[6rem] md:w-[5.5rem] md:h-[7.5rem] lg:w-[7rem] lg:h-[9.5rem]",
-        "rounded-lg border-2",
+        "card",
         "relative",
         "transition-all duration-300 ease-in-out",
         "bg-white dark:bg-slate-800",
@@ -51,14 +90,53 @@ export function Card({ card, onClick, className, disabled }: CardProps) {
         disabled && "hover:scale-100 active:scale-100",
         className
       )}
+      style={{
+        width: `${width}px`,
+        height: `${height}px`,
+        borderRadius: `${styles.borderRadius}px`,
+        borderWidth: `${styles.borderWidth}px`,
+        borderStyle: 'solid'
+      }}
     >
-      <div className="absolute top-0.5 left-1.5 md:top-1 md:left-2 lg:top-2 lg:left-3 flex gap-0.5">
-        <span className={cn("text-lg md:text-xl lg:text-2xl font-semibold", suitColor)}>{value}</span>
-        <span className={cn("text-lg md:text-xl lg:text-2xl", suitColor)}>{suitSymbol}</span>
+      <div 
+        className="absolute flex gap-0.5"
+        style={{
+          top: `${styles.paddingTop}px`,
+          left: `${styles.paddingLeft}px`,
+        }}
+      >
+        <span 
+          className={cn("font-semibold", suitColor)}
+          style={{ fontSize: `${styles.fontSize}px`, lineHeight: 1 }}
+        >
+          {value}
+        </span>
+        <span 
+          className={suitColor}
+          style={{ fontSize: `${styles.fontSize}px`, lineHeight: 1 }}
+        >
+          {suitSymbol}
+        </span>
       </div>
-      <div className="absolute bottom-0.5 right-1.5 md:bottom-1 md:right-2 lg:bottom-2 lg:right-3 flex gap-0.5 rotate-180">
-        <span className={cn("text-lg md:text-xl lg:text-2xl font-semibold", suitColor)}>{value}</span>
-        <span className={cn("text-lg md:text-xl lg:text-2xl", suitColor)}>{suitSymbol}</span>
+      <div 
+        className="absolute flex gap-0.5 rotate-180"
+        style={{
+          bottom: `${styles.paddingTop}px`,
+          right: `${styles.paddingLeft}px`,
+        }}
+      >
+        <span 
+          className={cn("font-semibold", suitColor)}
+          style={{ fontSize: `${styles.fontSize}px`, lineHeight: 1 }}
+        >
+          {value}
+        </span>
+        <span 
+          className={suitColor}
+          style={{ fontSize: `${styles.fontSize}px`, lineHeight: 1 }}
+        >
+          {suitSymbol}
+        </span>
       </div>
     </button>
   );

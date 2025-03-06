@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import Game from "@/pages/game";
 import NotFound from "@/pages/not-found";
 import { GameStateProvider } from "@/lib/game-state";
+import { useEffect } from 'react';
 
 // Check if we're in standalone mode - check both process.env and window.STANDALONE_MODE
 const isStandaloneMode = 
@@ -29,6 +30,22 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    // Handle iOS standalone mode
+    if (window.navigator.standalone) {
+      document.documentElement.classList.add('ios-standalone');
+      
+      // Prevent scrolling in standalone mode
+      document.body.style.overflow = 'hidden';
+      
+      // Add padding for iOS safe areas
+      document.body.style.paddingTop = 'env(safe-area-inset-top)';
+      document.body.style.paddingBottom = 'env(safe-area-inset-bottom)';
+      document.body.style.paddingLeft = 'env(safe-area-inset-left)';
+      document.body.style.paddingRight = 'env(safe-area-inset-right)';
+    }
+  }, []);
+
   console.log('App rendering, standalone mode:', isStandaloneMode);
   
   // In standalone mode, render the Game component directly

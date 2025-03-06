@@ -9,56 +9,48 @@ interface PileProps {
   onCardClick?: (pileId: number) => void;
   className?: string;
   disabled?: boolean;
+  cardSize: { width: number; height: number };
+  isOlderIOS?: boolean;
 }
 
-export function Pile({ pile, onCardClick, className, disabled }: PileProps) {
+export function Pile({ pile, onCardClick, className, disabled, cardSize, isOlderIOS = false }: PileProps) {
   const topCard = pile.cards[pile.cards.length - 1];
   const [cardOffset, setCardOffset] = useState(25);
 
-  // Adjust card offset based on viewport height and card size
+  // Calculate card offset based on card size
   useEffect(() => {
-    const updateOffset = () => {
-      // Base card heights at different breakpoints (matching the Card component)
-      const smallCardHeight = 96; // 6rem in pixels
-      const mediumCardHeight = 120; // 7.5rem in pixels
-      const largeCardHeight = 152; // 9.5rem in pixels
-      
-      // Determine current card height based on screen size
-      let currentCardHeight;
-      if (window.innerWidth >= 1024) {
-        currentCardHeight = largeCardHeight;
-      } else if (window.innerWidth >= 768) {
-        currentCardHeight = mediumCardHeight;
-      } else {
-        currentCardHeight = smallCardHeight;
-      }
-      
-      // Calculate offset as a percentage of card height
-      // Reduced percentage for more compact stacking
-      const offsetPercentage = 0.3;
-      const calculatedOffset = Math.round(currentCardHeight * offsetPercentage);
+    if (cardSize.height > 0) {
+      // Calculate offset as percentage of card height
+      // Adjust based on device
+      const offsetPercentage = isOlderIOS ? 0.25 : 0.3;
+      const calculatedOffset = Math.round(cardSize.height * offsetPercentage);
       
       // Apply minimum and maximum constraints
-      const minOffset = 20;
-      const maxOffset = 50;
+      // Adjust based on device
+      const minOffset = isOlderIOS ? 12 : 15;
+      const maxOffset = isOlderIOS ? 30 : 40;
       const finalOffset = Math.max(minOffset, Math.min(calculatedOffset, maxOffset));
       
       setCardOffset(finalOffset);
-    };
+    }
+  }, [cardSize.height, isOlderIOS]);
 
-    updateOffset();
-    window.addEventListener('resize', updateOffset);
-    return () => window.removeEventListener('resize', updateOffset);
-  }, []);
+  // Calculate total height needed for the pile
+  const pileHeight = pile.cards.length === 0 
+    ? cardSize.height 
+    : cardSize.height + (cardOffset * (pile.cards.length - 1));
 
   return (
     <div 
       className={cn(
-        "relative w-[4.5rem] md:w-[5.5rem] lg:w-[7rem]",
-        pile.cards.length === 0 ? "h-[6rem] md:h-[7.5rem] lg:h-[9.5rem]" : "min-h-[9rem] md:min-h-[11rem] lg:min-h-[14rem]", 
+        "relative",
         pile.cards.length === 0 && "border-2 border-dashed border-gray-300 rounded-lg", 
         className
       )}
+      style={{
+        width: `${cardSize.width}px`,
+        height: `${pileHeight}px`
+      }}
     >
       {pile.cards.map((card, index) => (
         <motion.div
@@ -82,6 +74,9 @@ export function Pile({ pile, onCardClick, className, disabled }: PileProps) {
             card={card}
             onClick={() => onCardClick?.(pile.id)}
             disabled={!topCard || card.id !== topCard.id || disabled}
+            width={cardSize.width}
+            height={cardSize.height}
+            isOlderIOS={isOlderIOS}
           />
         </motion.div>
       ))}
