@@ -81,7 +81,7 @@ export function Pile({ pile, onCardClick, cardSize, isOlderIOS, children }: Pile
                 zIndex: index
               }}
               transition={{
-                duration: 0.3,
+                duration: 0.0,
                 ease: [0.4, 0, 0.2, 1]
               }}
               style={{
