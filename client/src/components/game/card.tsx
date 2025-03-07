@@ -18,7 +18,9 @@ export function Card({ card, onClick, className, disabled, width, height, isOlde
     paddingTop: 4,
     paddingLeft: 4,
     borderRadius: 5,
-    borderWidth: 1
+    borderWidth: 1,
+    shadowBlur: 4,
+    shadowOffset: 2
   });
   
   // Calculate styles when dimensions change
@@ -39,19 +41,27 @@ export function Card({ card, onClick, className, disabled, width, height, isOlde
       const calculatedBorderRadius = Math.max(isOlderIOS ? 4 : 6, Math.min(isOlderIOS ? 10 : 12, width * borderRadiusPercent));
       const calculatedBorderWidth = Math.max(1, Math.min(2, width * 0.008));
       
+      // Shadow properties
+      const shadowBlur = Math.max(2, Math.min(8, width * 0.03));
+      const shadowOffset = Math.max(1, Math.min(4, width * 0.015));
+      
       setStyles({
         fontSize: calculatedFontSize,
         paddingTop: calculatedPaddingTop,
         paddingLeft: calculatedPaddingLeft,
         borderRadius: calculatedBorderRadius,
-        borderWidth: calculatedBorderWidth
+        borderWidth: calculatedBorderWidth,
+        shadowBlur,
+        shadowOffset
       });
     }
   }, [width, height, isOlderIOS]);
 
   const suitColor = card.suit === CardSuit.Hearts || card.suit === CardSuit.Diamonds
-    ? "text-red-500 dark:text-red-400"
-    : "text-slate-900 dark:text-slate-100";
+    ? "#c41e3a"
+    : card.suit === CardSuit.Clubs 
+      ? "#000000"
+      : "#1a1a1a";
 
   const suitSymbol = {
     [CardSuit.Hearts]: "♥",
@@ -84,8 +94,6 @@ export function Card({ card, onClick, className, disabled, width, height, isOlde
         "card",
         "relative",
         "transition-all duration-300 ease-in-out",
-        "bg-white dark:bg-slate-800",
-        "border-gray-200 dark:border-gray-700",
         "hover:scale-105 active:scale-95",
         disabled && "hover:scale-100 active:scale-100",
         className
@@ -95,7 +103,11 @@ export function Card({ card, onClick, className, disabled, width, height, isOlde
         height: `${height}px`,
         borderRadius: `${styles.borderRadius}px`,
         borderWidth: `${styles.borderWidth}px`,
-        borderStyle: 'solid'
+        borderStyle: 'solid',
+        borderColor: 'rgba(220, 220, 220, 1)',
+        boxShadow: `0 ${styles.shadowOffset}px ${styles.shadowBlur}px rgba(0, 0, 0, 0.2)`,
+        backgroundColor: '#ffffff',
+        backgroundImage: 'none',
       }}
     >
       <div 
@@ -106,14 +118,21 @@ export function Card({ card, onClick, className, disabled, width, height, isOlde
         }}
       >
         <span 
-          className={cn("font-semibold", suitColor)}
-          style={{ fontSize: `${styles.fontSize}px`, lineHeight: 1 }}
+          className="font-bold"
+          style={{ 
+            fontSize: `${styles.fontSize}px`, 
+            lineHeight: 1,
+            color: suitColor 
+          }}
         >
           {value}
         </span>
         <span 
-          className={suitColor}
-          style={{ fontSize: `${styles.fontSize}px`, lineHeight: 1 }}
+          style={{ 
+            fontSize: `${styles.fontSize}px`, 
+            lineHeight: 1,
+            color: suitColor 
+          }}
         >
           {suitSymbol}
         </span>
@@ -126,17 +145,38 @@ export function Card({ card, onClick, className, disabled, width, height, isOlde
         }}
       >
         <span 
-          className={cn("font-semibold", suitColor)}
-          style={{ fontSize: `${styles.fontSize}px`, lineHeight: 1 }}
+          className="font-bold"
+          style={{ 
+            fontSize: `${styles.fontSize}px`, 
+            lineHeight: 1,
+            color: suitColor 
+          }}
         >
           {value}
         </span>
         <span 
-          className={suitColor}
-          style={{ fontSize: `${styles.fontSize}px`, lineHeight: 1 }}
+          style={{ 
+            fontSize: `${styles.fontSize}px`, 
+            lineHeight: 1,
+            color: suitColor 
+          }}
         >
           {suitSymbol}
         </span>
+      </div>
+      
+      {/* Center suit for visual appeal */}
+      <div 
+        className="absolute transform -translate-x-1/2 -translate-y-1/2"
+        style={{
+          top: '50%',
+          left: '50%',
+          fontSize: `${styles.fontSize * 2}px`,
+          opacity: 1,
+          color: suitColor
+        }}
+      >
+        {suitSymbol}
       </div>
     </button>
   );

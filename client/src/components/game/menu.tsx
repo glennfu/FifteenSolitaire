@@ -43,6 +43,7 @@ export function Menu() {
         size="icon"
         onClick={handleNewGameClick}
         aria-label="New Game"
+        className="text-amber-100 hover:text-amber-50 hover:bg-transparent"
       >
         <RefreshCw className="h-6 w-6" />
       </Button>

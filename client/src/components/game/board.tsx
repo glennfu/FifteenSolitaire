@@ -2,6 +2,10 @@ import { useGameState } from "@/lib/game-state";
 import { Pile } from "./pile";
 import { useEffect, useState, useRef, useCallback } from "react";
 
+const tableStyles = {
+  background: '#1a6c3d', // Solid color as fallback
+};
+
 export function Board() {
   const { state, makeMove, undo, redo } = useGameState();
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 });
@@ -129,7 +133,7 @@ export function Board() {
       const availableWidth = containerRect.width;
       
       // Adjust footer height based on device
-      const footerHeight = isOlderIOS ? 120 : 96; // 7.5rem for older iOS, 6rem for others
+      const footerHeight = isOlderIOS ? 290 : 146; // 7.5rem for older iOS, 6rem for others
       const availableHeight = Math.min(
         containerRect.height, 
         window.innerHeight - footerHeight
@@ -269,9 +273,11 @@ export function Board() {
   return (
     <div 
       ref={containerRef}
-      className="flex justify-center items-start w-full h-full"
+      className="flex justify-center items-start w-full"
       style={{
-        height: isOlderIOS ? "calc(100vh - 7.5rem)" : "calc(100vh - 6rem)",
+        ...tableStyles,
+        paddingBottom: "80px", // Match the footer height
+        minHeight: "calc(100vh - 80px)", // Subtract footer height from viewport height
       }}
     >
       <div 
@@ -279,16 +285,15 @@ export function Board() {
         className="game-board mx-auto"
         style={{ 
           userSelect: "none",
-          height: "auto", // Use auto height to prevent stretching
-          maxHeight: "100%", // Ensure it doesn't exceed container height
-          overflow: "hidden",
-          width: initialCalculationDone ? `${gridWidth}px` : "95%", // Use percentage width if calculation not done
+          width: initialCalculationDone ? `${gridWidth}px` : "95%",
           maxWidth: "95vmin",
-          paddingTop: isOlderIOS ? "var(--vertical-gap, 12px)" : "2vmin",
-          paddingBottom: isOlderIOS ? "var(--vertical-gap, 12px)" : "2vmin",
+          paddingTop: "2vmin",
+          paddingBottom: "10vmin", // Adjust padding to prevent cards from being cut off
           display: "flex",
           flexDirection: "column",
-          justifyContent: verticalSpacing > 0 ? "space-between" : "flex-start"
+          justifyContent: "flex-start",
+          gap: "1vh",
+          marginTop: "1vh",
         }}
       >
         {isOlderIOS ? (

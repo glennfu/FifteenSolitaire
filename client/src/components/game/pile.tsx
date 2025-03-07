@@ -51,44 +51,54 @@ export function Pile({ pile, onCardClick, className, disabled, cardSize, isOlder
     <div 
       className={cn(
         "relative",
-        pile.cards.length === 0 && "border-2 border-dashed border-gray-300 rounded-lg", 
+        pile.cards.length === 0 && "border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-opacity-30 bg-gray-100 dark:bg-gray-800", 
         className,
         pile.cards.length > 0 && !disabled && "cursor-pointer"
       )}
       style={{
         width: `${cardSize.width}px`,
-        height: `${pileHeight}px`
+        height: `${pileHeight}px`,
+        boxShadow: pile.cards.length === 0 ? 'inset 0 0 10px rgba(0, 0, 0, 0.05)' : 'none'
       }}
       onClick={handlePileClick}
     >
-      {pile.cards.map((card, index) => (
-        <motion.div
-          key={card.id}
-          layout
-          initial={false}
-          animate={{
-            y: index * cardOffset
-          }}
-          transition={{
-            duration: 0.3,
-            ease: [0.4, 0, 0.2, 1]
-          }}
-          style={{
-            position: 'absolute',
-            width: '100%',
-            zIndex: index,
-            pointerEvents: 'none' // Prevent cards from capturing clicks
-          }}
-        >
-          <Card
-            card={card}
-            disabled={true} // All cards are now non-clickable individually
-            width={cardSize.width}
-            height={cardSize.height}
-            isOlderIOS={isOlderIOS}
-          />
-        </motion.div>
-      ))}
+      {pile.cards.map((card, index) => {
+        // Generate a truly random rotation for each card
+        // Use the card's ID to create a consistent but unique rotation for each card
+        const cardIdSum = card.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+        const randomRotation = ((cardIdSum % 3) - 1) * 0.8; // -0.8 to +0.8 degrees (slightly reduced)
+        
+        return (
+          <motion.div
+            key={card.id}
+            layout
+            initial={false}
+            animate={{
+              y: index * cardOffset,
+              rotate: randomRotation,
+              zIndex: index
+            }}
+            transition={{
+              duration: 0.3,
+              ease: [0.4, 0, 0.2, 1]
+            }}
+            style={{
+              position: 'absolute',
+              width: '100%',
+              pointerEvents: 'none',
+              filter: `drop-shadow(0 ${Math.min(3, index)}px ${Math.min(2, index)}px rgba(0, 0, 0, 0.1))`
+            }}
+          >
+            <Card
+              card={card}
+              disabled={true}
+              width={cardSize.width}
+              height={cardSize.height}
+              isOlderIOS={isOlderIOS}
+            />
+          </motion.div>
+        );
+      })}
     </div>
   );
 }
