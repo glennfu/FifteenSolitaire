@@ -3,7 +3,7 @@ import { Pile } from "./pile";
 import { useEffect, useState, useRef, useCallback } from "react";
 
 const tableStyles = {
-  background: '#1a6c3d', // Solid color as fallback
+  // Remove the background property completely
 };
 
 export function Board() {
@@ -275,7 +275,6 @@ export function Board() {
       ref={containerRef}
       className="flex justify-center items-start w-full"
       style={{
-        ...tableStyles,
         paddingBottom: "80px", // Match the footer height
         minHeight: "calc(100vh - 80px)", // Subtract footer height from viewport height
       }}

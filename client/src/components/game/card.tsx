@@ -1,6 +1,7 @@
 import { Card as CardType, CardSuit, CardValue } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
+import { textures } from "@/lib/utils";
 
 interface CardProps {
   card: CardType;
@@ -39,7 +40,7 @@ export function Card({ card, onClick, className, disabled, width, height, isOlde
       // Border properties
       const borderRadiusPercent = isOlderIOS ? 0.03 : 0.04;
       const calculatedBorderRadius = Math.max(isOlderIOS ? 4 : 6, Math.min(isOlderIOS ? 10 : 12, width * borderRadiusPercent));
-      const calculatedBorderWidth = Math.max(1, Math.min(2, width * 0.008));
+      const calculatedBorderWidth = Math.max(1, Math.min(2, width * 0.02));
       
       // Shadow properties
       const shadowBlur = Math.max(2, Math.min(8, width * 0.03));
@@ -104,12 +105,16 @@ export function Card({ card, onClick, className, disabled, width, height, isOlde
         borderRadius: `${styles.borderRadius}px`,
         borderWidth: `${styles.borderWidth}px`,
         borderStyle: 'solid',
-        borderColor: 'rgba(220, 220, 220, 1)',
+        borderColor: 'rgb(200, 200, 200)',
         boxShadow: `0 ${styles.shadowOffset}px ${styles.shadowBlur}px rgba(0, 0, 0, 0.2)`,
         backgroundColor: '#ffffff',
-        backgroundImage: 'none',
+        position: 'relative',
+        overflow: 'hidden'
       }}
     >
+      {/* Add noise texture overlay with reduced opacity */}
+      <div className="absolute inset-0 noise-texture card-noise" />
+      
       <div 
         className="absolute flex gap-0.5"
         style={{
