@@ -6,6 +6,7 @@ import {
   CardValue,
   gameStateSchema
 } from "@shared/schema";
+import { z } from "zod";
 
 interface GameContextType {
   state: GameStateType;
@@ -365,19 +366,27 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadGame = useCallback((savedState: GameState) => {
-    const parsed = gameStateSchema.safeParse(savedState);
-    if (parsed.success) {
-      setState({
-        ...parsed.data,
-        gameWon: parsed.data.gameWon || false,
-        selectedPile: parsed.data.selectedPile || null,
-        selectedCardId: parsed.data.selectedCardId || null,
-        validMoves: parsed.data.validMoves || []
-      });
-    } else {
-      throw new Error("Invalid game state");
+    try {
+      const parsed = gameStateSchema.safeParse(savedState);
+      if (parsed.success) {
+        setState({
+          ...parsed.data,
+          // Ensure these properties exist with default values if they're missing
+          gameWon: parsed.data.gameWon || false,
+          selectedPile: parsed.data.selectedPile || null,
+          selectedCardId: parsed.data.selectedCardId || null,
+          validMoves: parsed.data.validMoves || [],
+          // Initialize redoStack if it doesn't exist
+          redoStack: parsed.data.redoStack || []
+        });
+      } else {
+        throw new Error("Invalid game state");
+      }
+    } catch (error) {
+      console.error("Error loading game:", error);
+      initGame(); // Fall back to a new game if loading fails
     }
-  }, []);
+  }, [initGame]);
 
   const toggleDebug = useCallback(() => {
     setState(prev => ({

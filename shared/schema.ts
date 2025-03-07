@@ -65,6 +65,19 @@ export const gameStateSchema = z.object({
     toPile: z.number(),
     card: cardSchema
   })),
+  redoStack: z.array(z.object({
+    fromPile: z.number(),
+    toPile: z.number(),
+    card: cardSchema
+  })).optional().default([]),
+  gameWon: z.boolean().optional().default(false),
+  selectedPile: z.number().nullable().optional().default(null),
+  selectedCardId: z.string().nullable().optional().default(null),
+  validMoves: z.array(z.object({
+    fromPile: z.number(),
+    toPile: z.number(),
+    card: cardSchema
+  })).optional().default([]),
   gamesWon: z.number(),
   debugMode: z.boolean()
 });
