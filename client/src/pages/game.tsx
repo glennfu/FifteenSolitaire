@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Board } from "@/components/game/board";
 import { Menu } from "@/components/game/menu";
 import { DebugPanel } from "@/components/game/debug-panel";
-import { WinDialog } from "@/components/game/win-dialog";
+import { WinAnimations } from "@/components/game/win-animations";
 import { useGameState } from "@/lib/game-state";
 import { Button } from "@/components/ui/button";
 import { Undo2 } from "lucide-react";
-import { textures } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Game() {
   const { state, undo, initGame, loadGame } = useGameState();
@@ -25,19 +25,11 @@ export default function Game() {
     }
   }, [loadGame, initGame]);
 
-  // Show win dialog when game is won
-  useEffect(() => {
-    if (state.gameWon && !showWinDialog) {
-      setShowWinDialog(true);
-    }
-  }, [state.gameWon]);
-
   const handleUndo = useCallback(() => {
     undo();
   }, [undo]);
 
   const handleNewGame = useCallback(() => {
-    setShowWinDialog(false);
     initGame();
   }, [initGame]);
 
@@ -52,18 +44,54 @@ export default function Game() {
 
       {state.debugMode && <DebugPanel />}
 
+      {/* Win animations */}
+      <WinAnimations isWon={state.gameWon} gamesWon={state.gamesWon} />
+
       <div className="fixed bottom-0 left-0 right-0 p-4 z-50" style={{ pointerEvents: "none" }}>
         <div className="flex justify-between items-center">
           <div className="wooden-ui" style={{ pointerEvents: "auto" }}>
             <Menu />
           </div>
           
-          <div className="wooden-ui" style={{ pointerEvents: "auto" }}>
-            <h1 className="text-2xl font-bold text-center text-amber-100">Fifteen</h1>
-            <p className="text-sm text-amber-200 text-center">
-              Games Won: {state.gamesWon}
-            </p>
-          </div>
+          <AnimatePresence mode="wait">
+            <motion.div 
+              key={state.gameWon ? "win" : "normal"}
+              className="wooden-ui" 
+              style={{ pointerEvents: "auto" }}
+              animate={state.gameWon ? {
+                scale: [1, 1.2, 1],
+                transition: { 
+                  duration: 1.5, 
+                  repeat: Infinity,
+                  repeatType: "reverse"
+                }
+              } : {}}
+            >
+              <h1 className="text-2xl font-bold text-center text-amber-100">
+                {state.gameWon ? "YOU WON!" : "Fifteen"}
+              </h1>
+              <motion.p 
+                className="text-sm text-amber-200 text-center"
+                animate={state.gameWon ? {
+                  scale: [1, 1.3, 1],
+                  color: [
+                    "rgb(253, 230, 138)", // amber-200
+                    "rgb(252, 211, 77)",  // amber-300
+                    "rgb(251, 191, 36)",  // amber-400
+                    "rgb(245, 158, 11)",  // amber-500
+                    "rgb(253, 230, 138)"  // back to amber-200
+                  ],
+                  transition: { 
+                    duration: 1, 
+                    repeat: Infinity,
+                    repeatType: "reverse"
+                  }
+                } : {}}
+              >
+                Games Won: {state.gamesWon}
+              </motion.p>
+            </motion.div>
+          </AnimatePresence>
           
           <div className="wooden-ui" style={{ pointerEvents: "auto" }}>
             <Button 
@@ -78,17 +106,6 @@ export default function Game() {
           </div>
         </div>
       </div>
-
-      {showWinDialog && (
-        <WinDialog 
-          onClose={() => setShowWinDialog(false)}
-          onNewGame={() => {
-            setShowWinDialog(false);
-            initGame();
-          }}
-          gamesWon={state.gamesWon}
-        />
-      )}
     </div>
   );
 }

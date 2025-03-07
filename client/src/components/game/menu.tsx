@@ -26,20 +26,25 @@ export function Menu() {
 
   // Function to handle new game button click
   const handleNewGameClick = () => {
-    setShowNewGameDialog(true);
+    // Skip confirmation if game is already won
+    if (state.gameWon) {
+      initGame();
+    } else {
+      setShowNewGameDialog(true);
+    }
   };
-  
+
   // Function to start a new game
   const startNewGame = () => {
-    initGame();
     setShowNewGameDialog(false);
+    initGame();
   };
 
   return (
     <>
-      {/* New Game Button (replacing the hamburger menu) */}
-      <Button 
-        variant="ghost" 
+      {/* New Game Button (keeping the refresh icon) */}
+      <Button
+        variant="ghost"
         size="icon"
         onClick={handleNewGameClick}
         aria-label="New Game"

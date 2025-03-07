@@ -312,7 +312,18 @@ export function Board() {
                   onCardClick={(pileId) => makeMove(pileId)}
                   cardSize={cardSize}
                   isOlderIOS={true}
-                />
+                >
+                  {pile.isEmpty && (
+                    <div 
+                      className="empty-tile border-2 border-dashed border-white/20 rounded-md"
+                      style={{
+                        width: `${cardSize.width}px`,
+                        height: `${cardSize.height}px`,
+                        transition: 'opacity 0.3s ease-out'
+                      }}
+                    />
+                  )}
+                </Pile>
               ))}
             </div>
 
@@ -331,7 +342,18 @@ export function Board() {
                   onCardClick={(pileId) => makeMove(pileId)}
                   cardSize={cardSize}
                   isOlderIOS={true}
-                />
+                >
+                  {pile.isEmpty && (
+                    <div 
+                      className="empty-tile border-2 border-dashed border-white/20 rounded-md"
+                      style={{
+                        width: `${cardSize.width}px`,
+                        height: `${cardSize.height}px`,
+                        transition: 'opacity 0.3s ease-out'
+                      }}
+                    />
+                  )}
+                </Pile>
               ))}
             </div>
 
@@ -349,7 +371,18 @@ export function Board() {
                   onCardClick={(pileId) => makeMove(pileId)}
                   cardSize={cardSize}
                   isOlderIOS={true}
-                />
+                >
+                  {pile.isEmpty && (
+                    <div 
+                      className="empty-tile border-2 border-dashed border-white/20 rounded-md"
+                      style={{
+                        width: `${cardSize.width}px`,
+                        height: `${cardSize.height}px`,
+                        transition: 'opacity 0.3s ease-out'
+                      }}
+                    />
+                  )}
+                </Pile>
               ))}
             </div>
           </>
@@ -371,7 +404,18 @@ export function Board() {
                   onCardClick={(pileId) => makeMove(pileId)}
                   cardSize={cardSize}
                   isOlderIOS={false}
-                />
+                >
+                  {pile.isEmpty && (
+                    <div 
+                      className="empty-tile border-2 border-dashed border-white/20 rounded-md"
+                      style={{
+                        width: `${cardSize.width}px`,
+                        height: `${cardSize.height}px`,
+                        transition: 'opacity 0.3s ease-out'
+                      }}
+                    />
+                  )}
+                </Pile>
               ))}
             </div>
 
@@ -390,7 +434,18 @@ export function Board() {
                   onCardClick={(pileId) => makeMove(pileId)}
                   cardSize={cardSize}
                   isOlderIOS={false}
-                />
+                >
+                  {pile.isEmpty && (
+                    <div 
+                      className="empty-tile border-2 border-dashed border-white/20 rounded-md"
+                      style={{
+                        width: `${cardSize.width}px`,
+                        height: `${cardSize.height}px`,
+                        transition: 'opacity 0.3s ease-out'
+                      }}
+                    />
+                  )}
+                </Pile>
               ))}
             </div>
 
@@ -408,7 +463,18 @@ export function Board() {
                   onCardClick={(pileId) => makeMove(pileId)}
                   cardSize={cardSize}
                   isOlderIOS={false}
-                />
+                >
+                  {pile.isEmpty && (
+                    <div 
+                      className="empty-tile border-2 border-dashed border-white/20 rounded-md"
+                      style={{
+                        width: `${cardSize.width}px`,
+                        height: `${cardSize.height}px`,
+                        transition: 'opacity 0.3s ease-out'
+                      }}
+                    />
+                  )}
+                </Pile>
               ))}
             </div>
           </>

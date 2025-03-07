@@ -73,10 +73,35 @@ interface GameState {
 
 
 function isGoalState(piles: GamePile[]): boolean {
-  return piles.every(pile =>
-    pile.cards.length === 0 ||
-    (pile.cards.length === 4 && pile.cards.every(card => card.value === pile.cards[0].value))
-  );
+  // For debugging
+  console.log("Checking win condition");
+  
+  // Game is won when all non-empty piles have exactly 4 cards of the same value
+  for (const pile of piles) {
+    // Skip empty piles
+    if (pile.isEmpty || pile.cards.length === 0) {
+      continue;
+    }
+    
+    // If a pile has cards but not exactly 4, game is not won
+    if (pile.cards.length !== 4) {
+      console.log(`Pile ${pile.id} has ${pile.cards.length} cards, not 4`);
+      return false;
+    }
+    
+    // If cards don't all have the same value, game is not won
+    const firstValue = pile.cards[0].value;
+    for (const card of pile.cards) {
+      if (card.value !== firstValue) {
+        console.log(`Pile ${pile.id} has mixed values`);
+        return false;
+      }
+    }
+  }
+  
+  // If we get here, all non-empty piles have exactly 4 cards of the same value
+  console.log("Game is won!");
+  return true;
 }
 
 function getValidMoves(piles: GamePile[]): { fromPile: number; toPile: number }[] {
@@ -143,6 +168,11 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         pile.cards = deck.slice(cardIndex, cardIndex + 4);
         cardIndex += 4;
       }
+    });
+
+    // Update isEmpty property based on actual card count
+    piles.forEach(pile => {
+      pile.isEmpty = pile.cards.length === 0;
     });
 
     setState(prev => ({
@@ -270,22 +300,26 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       const cardToMove = fromPile.cards[fromPile.cards.length - 1];
       newPiles[pileId] = {
         ...fromPile,
-        cards: fromPile.cards.slice(0, -1)
+        cards: fromPile.cards.slice(0, -1),
+        isEmpty: fromPile.cards.length === 1 // Will be empty after removing the card
       };
 
       // Add to target - use the exact same card object to preserve suit
       newPiles[targetMove.toPile] = {
         ...targetPile,
-        cards: [...targetPile.cards, cardToMove]
+        cards: [...targetPile.cards, cardToMove],
+        isEmpty: false // No longer empty after adding a card
       };
 
-      // Check win condition
-      const hasWon = newPiles.every(pile =>
-        pile.cards.length === 0 ||
-        (pile.cards.length === 4 && pile.cards.every(card => card.value === pile.cards[0].value))
-      );
+      // Check win condition after the move is applied
+      const hasWon = isGoalState(newPiles);
+      console.log("Win condition result:", hasWon);
 
-      return {
+      // If game is won, increment games won counter
+      const newGamesWon = hasWon ? prev.gamesWon + 1 : prev.gamesWon;
+      
+      // Create the new state with updated win status
+      const newState = {
         ...prev,
         piles: newPiles,
         moveHistory: [...prev.moveHistory, {
@@ -293,34 +327,108 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
           toPile: targetMove.toPile,
           card: cardToMove
         }],
-        gamesWon: hasWon ? prev.gamesWon + 1 : prev.gamesWon,
-        gameWon: hasWon,
-        selectedPile: pileId,
-        selectedCardId: cardToMove.id,
-        validMoves: validMoves,
-        redoStack: []
+        redoStack: [], // Clear redo stack on new move
+        gamesWon: newGamesWon,
+        gameWon: hasWon, // Set the win flag
+        selectedPile: null, // Reset selection after move
+        selectedCardId: null,
+        validMoves: []
       };
+      
+      // Log the new state for debugging
+      if (hasWon) {
+        console.log("Game won state:", newState);
+      }
+      
+      return newState;
     });
   }, []);
 
   const undo = useCallback(() => {
+    // First, cancel any ongoing animations by clearing all animation-related timeouts
+    const highestTimeoutId = setTimeout(() => {}, 0);
+    for (let i = 0; i < highestTimeoutId; i++) {
+      clearTimeout(i);
+    }
+    
+    // Reset all card animations with smooth transitions
+    const resetAllCards = () => {
+      // Get all cards and reset their styles with smooth transitions
+      const cards = document.querySelectorAll('.card');
+      cards.forEach(card => {
+        const element = card as HTMLElement;
+        // Use a smooth transition for returning cards
+        element.style.transition = 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease-out';
+        element.style.transform = '';
+        element.style.opacity = '1';
+      });
+      
+      // Reset empty tile opacity with smooth transition
+      const emptyTiles = document.querySelectorAll('.empty-tile');
+      emptyTiles.forEach(tile => {
+        const element = tile as HTMLElement;
+        element.style.transition = 'opacity 0.4s ease-out';
+        element.style.opacity = '1';
+      });
+    };
+    
+    // Reset cards with smooth animations before state update
+    resetAllCards();
+    
+    // Now update the state
     setState(prev => {
       if (prev.moveHistory.length === 0) return prev;
+      
+      // If we're not in a win state, just do a normal undo
+      if (!prev.gameWon) {
+        const lastMove = prev.moveHistory[prev.moveHistory.length - 1];
+        const newPiles = [...prev.piles];
 
+        // Remove card from target pile
+        newPiles[lastMove.toPile] = {
+          ...newPiles[lastMove.toPile],
+          cards: newPiles[lastMove.toPile].cards.slice(0, -1),
+          isEmpty: newPiles[lastMove.toPile].cards.length === 1
+        };
+
+        // Add card back to source pile
+        newPiles[lastMove.fromPile] = {
+          ...newPiles[lastMove.fromPile],
+          cards: [...newPiles[lastMove.fromPile].cards, lastMove.card],
+          isEmpty: false
+        };
+
+        return {
+          ...prev,
+          piles: newPiles,
+          moveHistory: prev.moveHistory.slice(0, -1),
+          redoStack: [...prev.redoStack, lastMove],
+          selectedPile: null,
+          selectedCardId: null,
+          validMoves: []
+        };
+      }
+      
+      // Special handling for undoing from a win state
       const lastMove = prev.moveHistory[prev.moveHistory.length - 1];
       const newPiles = [...prev.piles];
 
       // Remove card from target pile
       newPiles[lastMove.toPile] = {
         ...newPiles[lastMove.toPile],
-        cards: newPiles[lastMove.toPile].cards.slice(0, -1)
+        cards: newPiles[lastMove.toPile].cards.slice(0, -1),
+        isEmpty: newPiles[lastMove.toPile].cards.length === 1
       };
 
       // Add card back to source pile
       newPiles[lastMove.fromPile] = {
         ...newPiles[lastMove.fromPile],
-        cards: [...newPiles[lastMove.fromPile].cards, lastMove.card]
+        cards: [...newPiles[lastMove.fromPile].cards, lastMove.card],
+        isEmpty: false
       };
+
+      // Decrement the games won counter
+      const newGamesWon = Math.max(0, prev.gamesWon - 1);
 
       return {
         ...prev,
@@ -329,7 +437,9 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         redoStack: [...prev.redoStack, lastMove],
         selectedPile: null,
         selectedCardId: null,
-        validMoves: []
+        validMoves: [],
+        gameWon: false,
+        gamesWon: newGamesWon
       };
     });
   }, []);
@@ -344,13 +454,15 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       // Remove card from source pile
       newPiles[moveToRedo.fromPile] = {
         ...newPiles[moveToRedo.fromPile],
-        cards: newPiles[moveToRedo.fromPile].cards.slice(0, -1)
+        cards: newPiles[moveToRedo.fromPile].cards.slice(0, -1),
+        isEmpty: newPiles[moveToRedo.fromPile].cards.length === 1 // Will be empty after removing the card
       };
 
       // Add card to target pile
       newPiles[moveToRedo.toPile] = {
         ...newPiles[moveToRedo.toPile],
-        cards: [...newPiles[moveToRedo.toPile].cards, moveToRedo.card]
+        cards: [...newPiles[moveToRedo.toPile].cards, moveToRedo.card],
+        isEmpty: false // No longer empty after adding a card
       };
 
       return {
@@ -369,7 +481,8 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     try {
       const parsed = gameStateSchema.safeParse(savedState);
       if (parsed.success) {
-        setState({
+        // Create a copy of the parsed data
+        const loadedState = {
           ...parsed.data,
           // Ensure these properties exist with default values if they're missing
           gameWon: parsed.data.gameWon || false,
@@ -378,7 +491,15 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
           validMoves: parsed.data.validMoves || [],
           // Initialize redoStack if it doesn't exist
           redoStack: parsed.data.redoStack || []
-        });
+        };
+        
+        // Update isEmpty property based on actual card count for each pile
+        loadedState.piles = loadedState.piles.map(pile => ({
+          ...pile,
+          isEmpty: pile.cards.length === 0
+        }));
+        
+        setState(loadedState);
       } else {
         throw new Error("Invalid game state");
       }
