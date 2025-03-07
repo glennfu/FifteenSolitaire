@@ -40,17 +40,26 @@ export function Pile({ pile, onCardClick, className, disabled, cardSize, isOlder
     ? cardSize.height 
     : cardSize.height + (cardOffset * (pile.cards.length - 1));
 
+  // Handler for clicking anywhere on the pile
+  const handlePileClick = () => {
+    if (!disabled && pile.cards.length > 0) {
+      onCardClick?.(pile.id);
+    }
+  };
+
   return (
     <div 
       className={cn(
         "relative",
         pile.cards.length === 0 && "border-2 border-dashed border-gray-300 rounded-lg", 
-        className
+        className,
+        pile.cards.length > 0 && !disabled && "cursor-pointer"
       )}
       style={{
         width: `${cardSize.width}px`,
         height: `${pileHeight}px`
       }}
+      onClick={handlePileClick}
     >
       {pile.cards.map((card, index) => (
         <motion.div
@@ -68,12 +77,12 @@ export function Pile({ pile, onCardClick, className, disabled, cardSize, isOlder
             position: 'absolute',
             width: '100%',
             zIndex: index,
+            pointerEvents: 'none' // Prevent cards from capturing clicks
           }}
         >
           <Card
             card={card}
-            onClick={() => onCardClick?.(pile.id)}
-            disabled={!topCard || card.id !== topCard.id || disabled}
+            disabled={true} // All cards are now non-clickable individually
             width={cardSize.width}
             height={cardSize.height}
             isOlderIOS={isOlderIOS}
