@@ -163,26 +163,24 @@ async function extractCssFromBrowser() {
             res.writeHead(200);
             res.end('CSS received');
             
-            // Clean up and resolve
-            setTimeout(() => {
-              if (serverProcess) {
-                try {
-                  process.kill(-serverProcess.pid);
-                } catch (e) {
-                  console.warn('Error killing server process:', e);
-                }
+            // Clean up but don't wait for it
+            if (serverProcess) {
+              try {
+                process.kill(-serverProcess.pid);
+              } catch (e) {
+                // Ignore errors when killing the process
               }
-              
-              if (extractorServer) {
-                extractorServer.close();
-              }
-              
-              if (fs.existsSync(extractorPath)) {
-                fs.unlinkSync(extractorPath);
-              }
-              
-              resolve(extractedCss);
-            }, 1000);
+            }
+            
+            if (extractorServer) {
+              extractorServer.close();
+            }
+            
+            if (fs.existsSync(extractorPath)) {
+              fs.unlinkSync(extractorPath);
+            }
+            
+            resolve(extractedCss);
           });
         } else {
           res.writeHead(404);
@@ -278,7 +276,7 @@ async function extractCssFromBrowser() {
         try {
           process.kill(-serverProcess.pid);
         } catch (e) {
-          console.warn('Error killing server process:', e);
+          // Ignore errors when killing the process
         }
       }
       
@@ -348,6 +346,9 @@ async function applyStyles() {
   const fixedFile = path.join(projectRoot, 'dist-standalone', 'fifteen-solitaire.html');
   fs.copyFileSync(standaloneFile, fixedFile);
   console.log(`Created a copy at: ${fixedFile}`);
+  
+  // Exit immediately after creating the file
+  process.exit(0);
 }
 
 // Run the main function
@@ -356,6 +357,7 @@ applyStyles().catch(error => {
   process.exit(1);
 });
 
+// This code will never run due to the process.exit(0) in applyStyles
 // Copy necessary files for PWA
 const publicDir = path.join(__dirname, 'public');
 const buildDir = path.join(__dirname, 'dist');

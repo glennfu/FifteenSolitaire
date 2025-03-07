@@ -17,3 +17,7 @@ npm run dev
 # Upload to Dreamhost
 
     ./upload.sh
+
+# All together now
+
+    npm run build:simple-fix && ./upload.sh
