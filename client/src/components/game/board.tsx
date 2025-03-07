@@ -1,15 +1,118 @@
 import { useGameState } from "@/lib/game-state";
 import { Pile } from "./pile";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 
 export function Board() {
-  const { state, makeMove } = useGameState();
+  const { state, makeMove, undo, redo } = useGameState();
   const [cardSize, setCardSize] = useState({ width: 0, height: 0 });
   const boardRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [gridWidth, setGridWidth] = useState(0);
   const [verticalSpacing, setVerticalSpacing] = useState(0);
   const [initialCalculationDone, setInitialCalculationDone] = useState(false);
+  
+  // Touch gesture tracking
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const minSwipeDistance = 50; // Minimum distance required for a swipe
+  
+  // Debounce mechanism for gestures
+  const lastGestureTime = useRef<number>(0);
+  const gestureDebounceTime = 500; // Milliseconds to wait before allowing another gesture action
+  
+  // Handle touch start
+  const handleTouchStart = useCallback((e: TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+  
+  // Handle touch end
+  const handleTouchEnd = useCallback((e: TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) {
+      return;
+    }
+    
+    const now = Date.now();
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    
+    const deltaX = touchEndX - touchStartX.current;
+    const deltaY = touchEndY - touchStartY.current;
+    
+    // Check if horizontal swipe is more significant than vertical
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      // Check if enough time has passed since last gesture
+      if ((now - lastGestureTime.current) > gestureDebounceTime) {
+        // Left-to-right swipe (backward) for undo
+        if (deltaX > minSwipeDistance) {
+          e.preventDefault();
+          if (state.moveHistory.length > 0) {
+            undo();
+            lastGestureTime.current = now;
+          }
+        }
+        // Right-to-left swipe (forward) for redo
+        else if (deltaX < -minSwipeDistance) {
+          e.preventDefault();
+          if (state.redoStack && state.redoStack.length > 0) {
+            redo();
+            lastGestureTime.current = now;
+          }
+        }
+      }
+    }
+    
+    // Reset touch tracking
+    touchStartX.current = null;
+    touchStartY.current = null;
+  }, [undo, redo, state.moveHistory.length, state.redoStack]);
+  
+  // Handle wheel events for desktop trackpad gestures
+  const handleWheel = useCallback((e: WheelEvent) => {
+    const now = Date.now();
+    
+    // Check if it's likely a horizontal trackpad gesture
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 50) {
+      // Check if enough time has passed since last gesture
+      if ((now - lastGestureTime.current) > gestureDebounceTime) {
+        // Right swipe (negative deltaX) for undo
+        if (e.deltaX < -50) {
+          e.preventDefault();
+          if (state.moveHistory.length > 0) {
+            undo();
+            lastGestureTime.current = now;
+          }
+        }
+        // Left swipe (positive deltaX) for redo
+        else if (e.deltaX > 50) {
+          e.preventDefault();
+          if (state.redoStack && state.redoStack.length > 0) {
+            redo();
+            lastGestureTime.current = now;
+          }
+        }
+      }
+    }
+  }, [undo, redo, state.moveHistory.length, state.redoStack]);
+  
+  // Add event listeners
+  useEffect(() => {
+    const boardElement = boardRef.current;
+    if (boardElement) {
+      // Touch events for mobile
+      boardElement.addEventListener('touchstart', handleTouchStart, { passive: false });
+      boardElement.addEventListener('touchend', handleTouchEnd, { passive: false });
+      
+      // Wheel events for desktop trackpad gestures
+      boardElement.addEventListener('wheel', handleWheel, { passive: false });
+      
+      return () => {
+        boardElement.removeEventListener('touchstart', handleTouchStart);
+        boardElement.removeEventListener('touchend', handleTouchEnd);
+        boardElement.removeEventListener('wheel', handleWheel);
+      };
+    }
+  }, [handleTouchStart, handleTouchEnd, handleWheel]);
 
   // Calculate optimal card size based on viewport
   useEffect(() => {

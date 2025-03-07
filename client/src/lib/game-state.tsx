@@ -11,6 +11,7 @@ interface GameContextType {
   state: GameStateType;
   makeMove: (pileId: number) => void;
   undo: () => void;
+  redo: () => void;
   initGame: () => void;
   loadGame: (state: GameStateType) => void;
   validateMove: (fromPile: number, toPile: number) => boolean;
@@ -52,6 +53,11 @@ interface GamePile {
 interface GameState {
   piles: GamePile[];
   moveHistory: {
+    fromPile: number;
+    toPile: number;
+    card: Card;
+  }[];
+  redoStack: {
     fromPile: number;
     toPile: number;
     card: Card;
@@ -112,6 +118,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GameState>({
     piles: [],
     moveHistory: [],
+    redoStack: [],
     gamesWon: 0,
     debugMode: false,
     gameWon: false,
@@ -289,7 +296,8 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         gameWon: hasWon,
         selectedPile: pileId,
         selectedCardId: cardToMove.id,
-        validMoves: validMoves
+        validMoves: validMoves,
+        redoStack: []
       };
     });
   }, []);
@@ -317,6 +325,38 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         piles: newPiles,
         moveHistory: prev.moveHistory.slice(0, -1),
+        redoStack: [...prev.redoStack, lastMove],
+        selectedPile: null,
+        selectedCardId: null,
+        validMoves: []
+      };
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    setState(prev => {
+      if (prev.redoStack.length === 0) return prev;
+
+      const moveToRedo = prev.redoStack[prev.redoStack.length - 1];
+      const newPiles = [...prev.piles];
+
+      // Remove card from source pile
+      newPiles[moveToRedo.fromPile] = {
+        ...newPiles[moveToRedo.fromPile],
+        cards: newPiles[moveToRedo.fromPile].cards.slice(0, -1)
+      };
+
+      // Add card to target pile
+      newPiles[moveToRedo.toPile] = {
+        ...newPiles[moveToRedo.toPile],
+        cards: [...newPiles[moveToRedo.toPile].cards, moveToRedo.card]
+      };
+
+      return {
+        ...prev,
+        piles: newPiles,
+        moveHistory: [...prev.moveHistory, moveToRedo],
+        redoStack: prev.redoStack.slice(0, -1),
         selectedPile: null,
         selectedCardId: null,
         validMoves: []
@@ -404,6 +444,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         state,
         makeMove,
         undo,
+        redo,
         initGame,
         loadGame,
         validateMove,
