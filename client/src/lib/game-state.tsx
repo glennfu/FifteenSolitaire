@@ -234,6 +234,18 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
       // Double check the move is still valid
       const targetPile = prev.piles[targetMove.toPile];
+      
+      // Fix: Check if we're trying to move a card to the same pile it's already in
+      if (targetMove.fromPile === targetMove.toPile) {
+        return {
+          ...prev,
+          selectedPile: null,
+          selectedCardId: null,
+          validMoves: []
+        };
+      }
+      
+      // Check if target pile is full
       if (targetPile.cards.length >= 4) {
         return {
           ...prev,
