@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameState } from '@/lib/game-state';
@@ -8,13 +8,38 @@ interface WinAnimationsProps {
   gamesWon: number;
 }
 
+// Helper function outside of component to avoid strict mode issues
+function randomInRange(min: number, max: number) {
+  return Math.random() * (max - min) + min;
+}
+
 export function WinAnimations({ isWon, gamesWon }: WinAnimationsProps) {
   const [previousGamesWon, setPreviousGamesWon] = useState(gamesWon);
   const [showConfetti, setShowConfetti] = useState(false);
+  const confettiIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const animationTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
+  
+  // Clean up function to clear all animation timeouts and intervals
+  const cleanupAnimations = () => {
+    // Clear the confetti interval if it exists
+    if (confettiIntervalRef.current !== null) {
+      clearInterval(confettiIntervalRef.current);
+      confettiIntervalRef.current = null;
+    }
+    
+    // Clear all stored timeouts
+    animationTimeoutsRef.current.forEach(timeoutId => {
+      clearTimeout(timeoutId);
+    });
+    animationTimeoutsRef.current = [];
+  };
   
   // Track when the game is won to trigger animations
   useEffect(() => {
     if (isWon) {
+      // Clean up any existing animations first
+      cleanupAnimations();
+      
       // Start confetti
       setShowConfetti(true);
       
@@ -23,15 +48,12 @@ export function WinAnimations({ isWon, gamesWon }: WinAnimationsProps) {
       const animationEnd = Date.now() + duration;
       const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
       
-      function randomInRange(min: number, max: number) {
-        return Math.random() * (max - min) + min;
-      }
-      
       const interval = setInterval(() => {
         const timeLeft = animationEnd - Date.now();
         
         if (timeLeft <= 0) {
-          return clearInterval(interval);
+          clearInterval(interval);
+          return;
         }
         
         const particleCount = 50 * (timeLeft / duration);
@@ -49,12 +71,26 @@ export function WinAnimations({ isWon, gamesWon }: WinAnimationsProps) {
         });
       }, 250);
       
+      // Store the interval ID for cleanup
+      confettiIntervalRef.current = interval;
+      
       // Update previous games won after animation
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         setPreviousGamesWon(gamesWon);
         setShowConfetti(false);
       }, 5000);
+      
+      // Store the timeout ID for cleanup
+      animationTimeoutsRef.current.push(timeoutId);
+    } else {
+      // If the game is no longer in a won state, clean up animations
+      cleanupAnimations();
     }
+    
+    // Clean up on component unmount
+    return () => {
+      cleanupAnimations();
+    };
   }, [isWon, gamesWon]);
   
   // Card whoosh animation
@@ -71,7 +107,7 @@ export function WinAnimations({ isWon, gamesWon }: WinAnimationsProps) {
       // Animate cards flying off with a slight delay
       const cards = document.querySelectorAll('.card');
       cards.forEach((card, index) => {
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           // Random direction for each card
           const randomX = (Math.random() - 0.5) * window.innerWidth * 2;
           const randomY = (Math.random() - 0.5) * window.innerHeight * 2;
@@ -82,6 +118,9 @@ export function WinAnimations({ isWon, gamesWon }: WinAnimationsProps) {
           element.style.transform = `translate(${randomX}px, ${randomY}px) rotate(${Math.random() * 720 - 360}deg)`;
           element.style.opacity = '0';
         }, 100 + index * 50); // Add a small initial delay before starting card animations
+        
+        // Store the timeout ID for cleanup
+        animationTimeoutsRef.current.push(timeoutId);
       });
     }
   }, [isWon]);
@@ -114,9 +153,14 @@ export function WinAnimations({ isWon, gamesWon }: WinAnimationsProps) {
       resetElements();
       
       // Use multiple timeouts to ensure we catch all elements
-      setTimeout(resetElements, 50);
-      setTimeout(resetElements, 150);
-      setTimeout(resetElements, 300);
+      const timeoutIds = [
+        setTimeout(resetElements, 50),
+        setTimeout(resetElements, 150),
+        setTimeout(resetElements, 300)
+      ];
+      
+      // Store the timeout IDs for cleanup
+      animationTimeoutsRef.current.push(...timeoutIds);
     }
   }, [isWon]);
   

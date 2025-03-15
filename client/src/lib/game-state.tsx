@@ -27,6 +27,197 @@ function getCookie(name: string): string | null {
   return null;
 }
 
+// Shake detection helper
+class ShakeDetector {
+  private shakeThreshold = 15; // Adjust sensitivity
+  private shakeTimeout = 2000; // 2 seconds
+  private lastTime = 0;
+  private lastX = 0;
+  private lastY = 0;
+  private lastZ = 0;
+  private shakeCount = 0;
+  private shakeStartTime = 0;
+  private onShake: () => void;
+  private isShaking = false;
+  private shakeTimer: number | null = null;
+  private progressElement: HTMLDivElement | null = null;
+
+  constructor(onShake: () => void) {
+    this.onShake = onShake;
+  }
+
+  start() {
+    if (window.DeviceMotionEvent) {
+      window.addEventListener('devicemotion', this.handleMotion);
+      console.log('Shake detection enabled');
+      
+      // Create a progress indicator element
+      this.createProgressIndicator();
+    } else {
+      console.log('Device motion not supported');
+    }
+  }
+
+  stop() {
+    window.removeEventListener('devicemotion', this.handleMotion);
+    if (this.shakeTimer !== null) {
+      window.clearTimeout(this.shakeTimer);
+      this.shakeTimer = null;
+    }
+    
+    // Remove the progress indicator
+    this.removeProgressIndicator();
+  }
+
+  private createProgressIndicator() {
+    // Create container
+    this.progressElement = document.createElement('div');
+    const style = this.progressElement.style;
+    style.position = 'fixed';
+    style.top = '10px';
+    style.left = '50%';
+    style.transform = 'translateX(-50%)';
+    style.width = '80%';
+    style.maxWidth = '300px';
+    style.height = '10px';
+    style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
+    style.borderRadius = '5px';
+    style.zIndex = '9999';
+    style.opacity = '0';
+    style.transition = 'opacity 0.3s ease-out';
+    
+    // Create progress bar
+    const progressBar = document.createElement('div');
+    progressBar.className = 'shake-progress-bar';
+    const barStyle = progressBar.style;
+    barStyle.width = '0%';
+    barStyle.height = '100%';
+    barStyle.backgroundColor = '#ffcc00';
+    barStyle.borderRadius = '5px';
+    barStyle.transition = 'width 0.1s linear';
+    
+    // Add label
+    const label = document.createElement('div');
+    label.innerText = 'Keep shaking...';
+    label.style.position = 'absolute';
+    label.style.top = '15px';
+    label.style.left = '0';
+    label.style.width = '100%';
+    label.style.textAlign = 'center';
+    label.style.color = 'white';
+    label.style.fontSize = '12px';
+    label.style.fontWeight = 'bold';
+    label.style.textShadow = '0 1px 2px rgba(0,0,0,0.5)';
+    
+    // Add progress bar to container
+    this.progressElement.appendChild(progressBar);
+    this.progressElement.appendChild(label);
+    
+    // Add to document
+    document.body.appendChild(this.progressElement);
+  }
+  
+  private removeProgressIndicator() {
+    if (this.progressElement && document.body.contains(this.progressElement)) {
+      document.body.removeChild(this.progressElement);
+      this.progressElement = null;
+    }
+  }
+  
+  private updateProgressBar(progress: number) {
+    if (!this.progressElement) return;
+    
+    const progressBar = this.progressElement.querySelector('.shake-progress-bar') as HTMLDivElement;
+    if (progressBar) {
+      // Show the progress element when shaking starts
+      if (progress > 0 && this.progressElement.style.opacity === '0') {
+        this.progressElement.style.opacity = '1';
+      }
+      
+      // Update the progress
+      progressBar.style.width = `${Math.min(100, progress)}%`;
+      
+      // Hide the progress element when shaking stops
+      if (progress === 0) {
+        this.progressElement.style.opacity = '0';
+      }
+    }
+  }
+
+  private handleMotion = (event: DeviceMotionEvent) => {
+    const current = Date.now();
+    const acceleration = event.accelerationIncludingGravity;
+    
+    if (!acceleration) return;
+    
+    // Only register if we've moved significantly in time
+    if ((current - this.lastTime) > 100) {
+      const deltaTime = current - this.lastTime;
+      this.lastTime = current;
+
+      const x = acceleration.x || 0;
+      const y = acceleration.y || 0;
+      const z = acceleration.z || 0;
+
+      const deltaX = Math.abs(this.lastX - x);
+      const deltaY = Math.abs(this.lastY - y);
+      const deltaZ = Math.abs(this.lastZ - z);
+
+      this.lastX = x;
+      this.lastY = y;
+      this.lastZ = z;
+
+      // Calculate the total acceleration delta
+      const totalDelta = deltaX + deltaY + deltaZ;
+
+      // If the movement is above our threshold, count it as a shake
+      if (totalDelta > this.shakeThreshold) {
+        if (!this.isShaking) {
+          this.isShaking = true;
+          this.shakeStartTime = current;
+          this.shakeCount = 1;
+          
+          // Start the shake timer
+          this.shakeTimer = window.setTimeout(() => {
+            if (this.isShaking && this.shakeCount >= 10) {
+              // Trigger the shake callback if we've been shaking for the required time
+              this.onShake();
+            }
+            this.resetShake();
+          }, this.shakeTimeout);
+        } else {
+          this.shakeCount++;
+          
+          // Calculate progress (0-100%)
+          const elapsedTime = current - this.shakeStartTime;
+          const progress = Math.min(100, (elapsedTime / this.shakeTimeout) * 100);
+          
+          // Update the progress bar
+          this.updateProgressBar(progress);
+        }
+      } else if (this.isShaking) {
+        // If we're shaking but the current motion is below threshold,
+        // we'll still update the progress
+        const elapsedTime = current - this.shakeStartTime;
+        const progress = Math.min(100, (elapsedTime / this.shakeTimeout) * 100);
+        this.updateProgressBar(progress);
+      }
+    }
+  };
+
+  private resetShake() {
+    this.isShaking = false;
+    this.shakeCount = 0;
+    if (this.shakeTimer !== null) {
+      window.clearTimeout(this.shakeTimer);
+      this.shakeTimer = null;
+    }
+    
+    // Reset progress bar
+    this.updateProgressBar(0);
+  }
+}
+
 interface GameContextType {
   state: GameStateType;
   makeMove: (pileId: number) => void;
@@ -37,6 +228,7 @@ interface GameContextType {
   validateMove: (fromPile: number, toPile: number) => boolean;
   toggleDebug: () => void;
   solve: () => void;
+  instantWin: () => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -187,6 +379,16 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const initGame = useCallback(() => {
+    // Cancel any ongoing animations by clearing all animation-related timeouts
+    const highestId = Number(window.setTimeout(() => {}, 0));
+    for (let i = 0; i < highestId; i++) {
+      try {
+        window.clearTimeout(i);
+      } catch (e) {
+        // Ignore errors from clearing invalid timeout IDs
+      }
+    }
+
     const deck = shuffleDeck();
     const piles = Array(15).fill(null).map((_, index) => ({
       id: index,
@@ -198,7 +400,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     let cardIndex = 0;
     piles.forEach((pile) => {
       if (!pile.isEmpty) {
-        pile.cards = deck.slice(cardIndex, cardIndex + 4);
+        (pile.cards as Card[]) = deck.slice(cardIndex, cardIndex + 4);
         cardIndex += 4;
       }
     });
@@ -218,6 +420,17 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       selectedCardId: null,
       validMoves: []
     }));
+    
+    // Add a subtle hint about the cheat code in the console
+    console.log("%c🃏 Fifteen Solitaire", "font-size: 16px; font-weight: bold; color: #8B4513;");
+    
+    // Different hints for mobile vs desktop
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      console.log("%cTip: Sometimes a good shake can solve all your problems...", "font-style: italic; color: #666;");
+    } else {
+      console.log("%cTip: Sometimes winning is just a keystroke away...", "font-style: italic; color: #666;");
+    }
   }, []);
 
   const validateMove = useCallback((fromPile: number, toPile: number): boolean => {
@@ -380,9 +593,13 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
 
   const undo = useCallback(() => {
     // First, cancel any ongoing animations by clearing all animation-related timeouts
-    const highestTimeoutId = setTimeout(() => {}, 0);
+    const highestTimeoutId = Number(setTimeout(() => {}, 0));
     for (let i = 0; i < highestTimeoutId; i++) {
-      clearTimeout(i);
+      try {
+        clearTimeout(i);
+      } catch (e) {
+        // Ignore errors from clearing invalid timeout IDs
+      }
     }
     
     // Reset all card animations with smooth transitions
@@ -614,6 +831,351 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.piles, makeMove]);
 
+  const instantWin = useCallback(() => {
+    // First, cancel any ongoing animations
+    const highestId = Number(window.setTimeout(() => {}, 0));
+    for (let i = 0; i < highestId; i++) {
+      try {
+        window.clearTimeout(i);
+      } catch (e) {
+        // Ignore errors from clearing invalid timeout IDs
+      }
+    }
+
+    // Reset all card animations
+    const cards = document.querySelectorAll('.card');
+    cards.forEach(card => {
+      const element = card as HTMLElement;
+      element.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease-out';
+      element.style.transform = '';
+      element.style.opacity = '1';
+    });
+
+    // Add a subtle flash effect to indicate cheat code activation
+    const flashElement = document.createElement('div');
+    flashElement.style.position = 'fixed';
+    flashElement.style.top = '0';
+    flashElement.style.left = '0';
+    flashElement.style.width = '100%';
+    flashElement.style.height = '100%';
+    flashElement.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+    flashElement.style.zIndex = '9999';
+    flashElement.style.pointerEvents = 'none';
+    flashElement.style.transition = 'opacity 0.5s ease-out';
+    document.body.appendChild(flashElement);
+
+    // Fade out and remove the flash element
+    setTimeout(() => {
+      flashElement.style.opacity = '0';
+      setTimeout(() => {
+        document.body.removeChild(flashElement);
+      }, 500);
+    }, 100);
+
+    // Create a new winning state
+    setState(prev => {
+      // Step 1: Collect all cards from all piles
+      const allCards = prev.piles.flatMap(pile => pile.cards);
+      
+      // Step 2: Group cards by value
+      const cardsByValue: Record<CardValue, Card[]> = {} as Record<CardValue, Card[]>;
+      allCards.forEach(card => {
+        if (!cardsByValue[card.value]) {
+          cardsByValue[card.value] = [];
+        }
+        cardsByValue[card.value].push(card);
+      });
+      
+      // Step 3: Analyze existing piles to find patterns
+      const pilePatterns: Record<number, { value: CardValue; count: number }> = {};
+      prev.piles.forEach((pile, pileIndex) => {
+        if (pile.cards.length === 0) return;
+        
+        // Check for 3 or 4 of a kind
+        const valueCount: Record<CardValue, number> = {} as Record<CardValue, number>;
+        pile.cards.forEach(card => {
+          valueCount[card.value] = (valueCount[card.value] || 0) + 1;
+        });
+        
+        // Find the most common value in this pile
+        let maxCount = 0;
+        let maxValue: CardValue | null = null;
+        
+        Object.entries(valueCount).forEach(([value, count]) => {
+          if (count > maxCount) {
+            maxCount = count;
+            maxValue = Number(value) as CardValue;
+          }
+        });
+        
+        // If we have 2 or more of a kind, record this pattern
+        if (maxCount >= 2 && maxValue !== null) {
+          pilePatterns[pileIndex] = { value: maxValue, count: maxCount };
+        }
+      });
+      
+      // Step 4: Create new piles with winning arrangement
+      const newPiles = Array(15).fill(null).map((_, index) => ({
+        id: index,
+        cards: [] as Card[],
+        isEmpty: false
+      }));
+      
+      // Step 5: Assign values to piles based on patterns
+      const assignedValues = new Set<CardValue>();
+      const assignedPiles = new Set<number>();
+      
+      // First, assign piles with 3 or 4 of a kind
+      Object.entries(pilePatterns).forEach(([pileIndex, pattern]) => {
+        const pileIdx = Number(pileIndex);
+        if (pattern.count >= 3 && !assignedValues.has(pattern.value)) {
+          // This pile already has 3 or 4 of the same value, keep it
+          assignedValues.add(pattern.value);
+          assignedPiles.add(pileIdx);
+          
+          // Get 4 cards of this value
+          const cardsOfValue = cardsByValue[pattern.value].slice(0, 4);
+          newPiles[pileIdx].cards = cardsOfValue;
+          
+          // Remove these cards from available cards
+          cardsByValue[pattern.value] = cardsByValue[pattern.value].filter(
+            card => !cardsOfValue.includes(card)
+          );
+        }
+      });
+      
+      // Next, assign piles with 2 of a kind (if no other pile has 2+ of the same value)
+      Object.entries(pilePatterns).forEach(([pileIndex, pattern]) => {
+        const pileIdx = Number(pileIndex);
+        if (pattern.count === 2 && !assignedValues.has(pattern.value) && !assignedPiles.has(pileIdx)) {
+          // Check if any other pile has 2+ of this value
+          const otherPileHasSameValue = Object.entries(pilePatterns)
+            .some(([otherIdx, otherPattern]) => 
+              Number(otherIdx) !== pileIdx && 
+              otherPattern.value === pattern.value && 
+              otherPattern.count >= 2
+            );
+          
+          if (!otherPileHasSameValue) {
+            // This pile has 2 of a kind and no other pile has 2+ of the same value
+            assignedValues.add(pattern.value);
+            assignedPiles.add(pileIdx);
+            
+            // Get 4 cards of this value
+            const cardsOfValue = cardsByValue[pattern.value].slice(0, 4);
+            newPiles[pileIdx].cards = cardsOfValue;
+            
+            // Remove these cards from available cards
+            cardsByValue[pattern.value] = cardsByValue[pattern.value].filter(
+              card => !cardsOfValue.includes(card)
+            );
+          }
+        }
+      });
+      
+      // Finally, assign remaining values to empty piles
+      const remainingValues = Object.keys(cardsByValue)
+        .map(v => Number(v) as CardValue)
+        .filter(value => !assignedValues.has(value) && cardsByValue[value].length === 4);
+      
+      // Find empty piles (excluding the two that should remain empty)
+      const emptyPileIndices = Array.from({ length: 15 }, (_, i) => i)
+        .filter(i => !assignedPiles.has(i))
+        .slice(0, remainingValues.length);
+      
+      // Assign remaining values to empty piles
+      remainingValues.forEach((value, index) => {
+        if (index < emptyPileIndices.length) {
+          const pileIdx = emptyPileIndices[index];
+          assignedValues.add(value);
+          assignedPiles.add(pileIdx);
+          
+          // Get 4 cards of this value
+          const cardsOfValue = cardsByValue[value].slice(0, 4);
+          newPiles[pileIdx].cards = cardsOfValue;
+        }
+      });
+      
+      // Mark empty piles
+      newPiles.forEach((pile, index) => {
+        pile.isEmpty = pile.cards.length === 0;
+      });
+      
+      // Ensure we have exactly 13 non-empty piles (with 2 empty piles)
+      const nonEmptyPiles = newPiles.filter(pile => !pile.isEmpty);
+      if (nonEmptyPiles.length !== 13) {
+        console.warn(`Expected 13 non-empty piles, but got ${nonEmptyPiles.length}`);
+      }
+      
+      // First update the piles without setting gameWon to true
+      return {
+        ...prev,
+        piles: newPiles,
+        moveHistory: [],
+        redoStack: [],
+        selectedPile: null,
+        selectedCardId: null,
+        validMoves: []
+      };
+    });
+    
+    // Set the game to won state after a small delay to allow animations to work properly
+    setTimeout(() => {
+      setState(prev => ({
+        ...prev,
+        gameWon: true,
+        gamesWon: prev.gamesWon + 1
+      }));
+    }, 300);
+  }, []);
+
+  // Add keyboard event listener for the "www" cheat code
+  useEffect(() => {
+    const keyPresses: { key: string; timestamp: number }[] = [];
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only track 'w' key presses
+      if (e.key.toLowerCase() === 'w') {
+        // Don't activate cheat if game is already won
+        if (state.gameWon) return;
+        
+        const now = Date.now();
+        
+        // Add this key press to the history
+        keyPresses.push({ key: 'w', timestamp: now });
+        
+        // Only keep key presses from the last second
+        const recentPresses = keyPresses.filter(press => now - press.timestamp < 1000);
+        
+        // Update the key press history
+        keyPresses.length = 0;
+        keyPresses.push(...recentPresses);
+        
+        // Check if we have 3 'w' presses within 1 second
+        if (recentPresses.length === 3 && recentPresses.every(press => press.key === 'w')) {
+          // Trigger the instant win
+          instantWin();
+          
+          // Clear the key press history
+          keyPresses.length = 0;
+        }
+      }
+    };
+    
+    // Add the event listener
+    window.addEventListener('keydown', handleKeyDown);
+    
+    // Clean up the event listener
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [instantWin, state.gameWon]);
+
+  // Add shake detection for mobile devices
+  useEffect(() => {
+    // Only initialize if we're on a mobile device
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    if (!isMobile) {
+      return; // Exit early if not on mobile
+    }
+    
+    // Function to initialize shake detection
+    const initShakeDetection = () => {
+      // Create shake detector
+      const shakeDetector = new ShakeDetector(() => {
+        // Don't activate if game is already won
+        if (state.gameWon) return;
+        
+        console.log('Shake detected! Triggering instant win...');
+        
+        // Add a vibration feedback if supported
+        if (navigator.vibrate) {
+          navigator.vibrate(200);
+        }
+        
+        // Trigger the instant win
+        instantWin();
+      });
+      
+      // Start the shake detector
+      shakeDetector.start();
+      
+      // Return cleanup function
+      return () => {
+        shakeDetector.stop();
+      };
+    };
+    
+    // Try to directly access device motion first - completely silent approach
+    let motionListener: ((e: DeviceMotionEvent) => void) | null = null;
+    let permissionTimeout: NodeJS.Timeout | null = null;
+    let directAccessSuccessful = false;
+    
+    // Test if we can access device motion directly
+    motionListener = (e: DeviceMotionEvent) => {
+      // If we get here with actual acceleration data, we have access
+      if (e.acceleration && (e.acceleration.x !== null || e.acceleration.y !== null || e.acceleration.z !== null)) {
+        directAccessSuccessful = true;
+        
+        // Remove the test listener
+        window.removeEventListener('devicemotion', motionListener!);
+        motionListener = null;
+        
+        // Clear any pending permission timeout
+        if (permissionTimeout) {
+          clearTimeout(permissionTimeout);
+          permissionTimeout = null;
+        }
+        
+        // Initialize shake detection directly
+        initShakeDetection();
+      }
+    };
+    
+    // Add the test listener
+    window.addEventListener('devicemotion', motionListener);
+    
+    // Set a timeout to check if we received any motion events
+    permissionTimeout = setTimeout(() => {
+      // If we haven't received any motion events after a short delay,
+      // we might need to request permission, but we'll do it silently
+      if (!directAccessSuccessful) {
+        // Remove the test listener
+        if (motionListener) {
+          window.removeEventListener('devicemotion', motionListener);
+          motionListener = null;
+        }
+        
+        // Check if we're on iOS which requires permission for DeviceMotion
+        const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+        const isIOS13Plus = isIOS && parseInt((navigator.userAgent.match(/OS (\d+)_/) || [])[1], 10) >= 13;
+        
+        // For iOS 13+ with permission API, try to request permission silently
+        if (isIOS13Plus && typeof (DeviceMotionEvent as any).requestPermission === 'function') {
+          // We won't show a button - just log that permission would be needed
+          console.log('Device motion permission would be required for shake detection');
+        } else {
+          // For other devices, try to initialize directly
+          initShakeDetection();
+        }
+      }
+    }, 1000); // Wait 1 second to see if we get motion events
+    
+    // Return cleanup function
+    return () => {
+      // Clean up the test listener
+      if (motionListener) {
+        window.removeEventListener('devicemotion', motionListener);
+      }
+      
+      // Clear any pending timeout
+      if (permissionTimeout) {
+        clearTimeout(permissionTimeout);
+      }
+    };
+  }, [instantWin, state.gameWon]);
+
   // Save state to localStorage and gamesWon to cookie whenever it changes
   useEffect(() => {
     // Save full state to localStorage
@@ -634,7 +1196,8 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
         loadGame,
         validateMove,
         toggleDebug,
-        solve
+        solve,
+        instantWin
       }}
     >
       {children}

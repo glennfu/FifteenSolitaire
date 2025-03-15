@@ -19,6 +19,37 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// Helper function to reset all card animations
+function resetAllCardAnimations() {
+  // Reset all cards with smooth transitions
+  const cards = document.querySelectorAll('.card');
+  cards.forEach(card => {
+    const element = card as HTMLElement;
+    // Use a smooth transition for returning cards
+    element.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease-out';
+    element.style.transform = '';
+    element.style.opacity = '1';
+  });
+  
+  // Reset empty tile opacity with smooth transition
+  const emptyTiles = document.querySelectorAll('.empty-tile');
+  emptyTiles.forEach(tile => {
+    const element = tile as HTMLElement;
+    element.style.transition = 'opacity 0.3s ease-out';
+    element.style.opacity = '1';
+  });
+  
+  // Also cancel any ongoing animations by clearing all animation-related timeouts
+  const highestId = Number(window.setTimeout(() => {}, 0));
+  for (let i = 0; i < highestId; i++) {
+    try {
+      window.clearTimeout(i);
+    } catch (e) {
+      // Ignore errors from clearing invalid timeout IDs
+    }
+  }
+}
+
 export function Menu() {
   const { initGame, state, toggleDebug, solve } = useGameState();
   const [showNewGameDialog, setShowNewGameDialog] = useState(false);
@@ -28,7 +59,11 @@ export function Menu() {
   const handleNewGameClick = () => {
     // Skip confirmation if game is already won
     if (state.gameWon) {
-      initGame();
+      resetAllCardAnimations();
+      // Start new game after a short delay to allow transitions to complete
+      setTimeout(() => {
+        initGame();
+      }, 50);
     } else {
       setShowNewGameDialog(true);
     }
@@ -37,7 +72,14 @@ export function Menu() {
   // Function to start a new game
   const startNewGame = () => {
     setShowNewGameDialog(false);
-    initGame();
+    
+    // First reset all animations
+    resetAllCardAnimations();
+    
+    // Then start a new game after a short delay to allow transitions to complete
+    setTimeout(() => {
+      initGame();
+    }, 50);
   };
 
   return (
