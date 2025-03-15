@@ -1,11 +1,11 @@
 {
-  "name": "Pyramid Solitaire",
-  "short_name": "Pyramid",
-  "description": "A fun pyramid solitaire card game",
-  "start_url": "/",
+  "name": "Fifteen Solitaire",
+  "short_name": "Fifteen",
+  "description": "A fun card game where you group cards of the same value",
+  "start_url": "/fifteen-solitaire.html",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "background_color": "#0d5c2e",
+  "theme_color": "#0d5c2e",
   "orientation": "portrait",
   "icons": [
     {

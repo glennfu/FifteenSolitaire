@@ -1,7 +1,8 @@
-const CACHE_NAME = 'pyramid-solitaire-v1';
+const CACHE_NAME = 'fifteen-solitaire-v1';
 const urlsToCache = [
   '/',
   '/index.html',
+  '/fifteen-solitaire.html',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
