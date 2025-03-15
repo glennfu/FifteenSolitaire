@@ -2,7 +2,7 @@ import { Card } from "./card";
 import { GamePile } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 interface PileProps {
   pile: GamePile;
@@ -10,34 +10,59 @@ interface PileProps {
   cardSize: { width: number; height: number };
   isOlderIOS: boolean;
   children?: React.ReactNode;
+  stackingOffset?: number;
 }
 
-export function Pile({ pile, onCardClick, cardSize, isOlderIOS, children }: PileProps) {
+export function Pile({ pile, onCardClick, cardSize, isOlderIOS, children, stackingOffset }: PileProps) {
   const topCard = pile.cards[pile.cards.length - 1];
   const [cardOffset, setCardOffset] = useState(25);
+  // Store the initial pile height in a ref to keep it consistent
+  const fixedHeightRef = useRef<number | null>(null);
+  // Add a ref to track if we need to reset the pile
+  const resetRef = useRef<boolean>(true);
 
   // Calculate card offset based on card size
   useEffect(() => {
     if (cardSize.height > 0) {
-      // Calculate offset as percentage of card height
-      // Adjust based on device
-      const offsetPercentage = isOlderIOS ? 0.25 : 0.3;
-      const calculatedOffset = Math.round(cardSize.height * offsetPercentage);
+      // Reset the fixed height ref when card size changes
+      fixedHeightRef.current = null;
+      resetRef.current = true;
       
-      // Apply minimum and maximum constraints
-      // Adjust based on device
-      const minOffset = isOlderIOS ? 12 : 15;
-      const maxOffset = isOlderIOS ? 30 : 40;
-      const finalOffset = Math.max(minOffset, Math.min(calculatedOffset, maxOffset));
+      // If a specific stackingOffset is provided, use that
+      if (stackingOffset !== undefined) {
+        const calculatedOffset = Math.round(cardSize.height * stackingOffset);
+        setCardOffset(calculatedOffset);
+      } else {
+        // Otherwise calculate offset as percentage of card height
+        // Adjust based on device
+        const offsetPercentage = isOlderIOS ? 0.25 : 0.3;
+        const calculatedOffset = Math.round(cardSize.height * offsetPercentage);
+        
+        // Apply minimum and maximum constraints
+        // Adjust based on device
+        const minOffset = isOlderIOS ? 12 : 15;
+        const maxOffset = isOlderIOS ? 30 : 40;
+        const finalOffset = Math.max(minOffset, Math.min(calculatedOffset, maxOffset));
+        
+        setCardOffset(finalOffset);
+      }
       
-      setCardOffset(finalOffset);
+      // Calculate a fixed height for the pile based on maximum possible cards (5)
+      // This will only be set once when the component mounts or when cardSize changes
+      if (fixedHeightRef.current === null) {
+        const maxCards = 5; // Maximum number of cards in a pile
+        const maxOffset = stackingOffset !== undefined 
+          ? Math.round(cardSize.height * stackingOffset)
+          : cardOffset;
+        const maxHeight = cardSize.height + (maxOffset * (maxCards - 1));
+        fixedHeightRef.current = maxHeight;
+      }
     }
-  }, [cardSize.height, isOlderIOS]);
+  }, [cardSize.height, isOlderIOS, stackingOffset]);
 
-  // Calculate total height needed for the pile
-  const pileHeight = pile.cards.length === 0 
-    ? cardSize.height 
-    : cardSize.height + (cardOffset * (pile.cards.length - 1));
+  // Always use the fixed height, regardless of the number of cards
+  // This ensures the layout never shifts when cards are moved
+  const pileHeight = fixedHeightRef.current || cardSize.height * 3;
 
   // Handler for clicking anywhere on the pile
   const handlePileClick = () => {
