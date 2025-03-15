@@ -8,6 +8,25 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 
+// Cookie helper functions
+function setCookie(name: string, value: string, days: number = 365) {
+  const date = new Date();
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+  const expires = "; expires=" + date.toUTCString();
+  document.cookie = name + "=" + value + expires + "; path=/";
+}
+
+function getCookie(name: string): string | null {
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+}
+
 interface GameContextType {
   state: GameStateType;
   makeMove: (pileId: number) => void;
@@ -153,6 +172,20 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     validMoves: []
   });
 
+  // Load gamesWon from cookie on initial mount
+  useEffect(() => {
+    const gamesWonFromCookie = getCookie("gamesWon");
+    if (gamesWonFromCookie) {
+      const parsedGamesWon = parseInt(gamesWonFromCookie, 10);
+      if (!isNaN(parsedGamesWon)) {
+        setState(prev => ({
+          ...prev,
+          gamesWon: parsedGamesWon
+        }));
+      }
+    }
+  }, []);
+
   const initGame = useCallback(() => {
     const deck = shuffleDeck();
     const piles = Array(15).fill(null).map((_, index) => ({
@@ -175,6 +208,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       pile.isEmpty = pile.cards.length === 0;
     });
 
+    // Preserve gamesWon when starting a new game
     setState(prev => ({
       ...prev,
       piles,
@@ -477,7 +511,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const loadGame = useCallback((savedState: GameState) => {
+  const loadGame = useCallback((savedState: GameStateType) => {
     try {
       const parsed = gameStateSchema.safeParse(savedState);
       if (parsed.success) {
@@ -491,7 +525,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
           validMoves: parsed.data.validMoves || [],
           // Initialize redoStack if it doesn't exist
           redoStack: parsed.data.redoStack || []
-        };
+        } as GameState; // Cast to our local GameState type
         
         // Update isEmpty property based on actual card count for each pile
         loadedState.piles = loadedState.piles.map(pile => ({
@@ -505,7 +539,24 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error("Error loading game:", error);
-      initGame(); // Fall back to a new game if loading fails
+      
+      // Try to recover gamesWon from cookie if localStorage fails
+      const gamesWonFromCookie = getCookie("gamesWon");
+      if (gamesWonFromCookie) {
+        const parsedGamesWon = parseInt(gamesWonFromCookie, 10);
+        if (!isNaN(parsedGamesWon)) {
+          // Initialize a new game but preserve gamesWon from cookie
+          initGame();
+          setState(prev => ({
+            ...prev,
+            gamesWon: parsedGamesWon
+          }));
+          return;
+        }
+      }
+      
+      // If no cookie data, just initialize a new game
+      initGame();
     }
   }, [initGame]);
 
@@ -563,15 +614,19 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.piles, makeMove]);
 
-  // Save state to localStorage whenever it changes
+  // Save state to localStorage and gamesWon to cookie whenever it changes
   useEffect(() => {
+    // Save full state to localStorage
     localStorage.setItem("gameState", JSON.stringify(state));
+    
+    // Save gamesWon to cookie as backup
+    setCookie("gamesWon", state.gamesWon.toString());
   }, [state]);
 
   return (
     <GameContext.Provider
       value={{
-        state,
+        state: state as unknown as GameStateType,
         makeMove,
         undo,
         redo,

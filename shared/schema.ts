@@ -42,6 +42,15 @@ export interface GameState {
     toPile: number;
     card: Card;
   }[];
+  redoStack?: {
+    fromPile: number;
+    toPile: number;
+    card: Card;
+  }[];
+  gameWon?: boolean;
+  selectedPile?: number | null;
+  selectedCardId?: string | null;
+  validMoves?: { fromPile: number; toPile: number }[];
   gamesWon: number;
   debugMode: boolean;
 }

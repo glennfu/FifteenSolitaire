@@ -13,14 +13,21 @@ export default function Game() {
   const [showWinDialog, setShowWinDialog] = useState(false);
 
   useEffect(() => {
+    // Try to load from localStorage first
+    // If localStorage fails (which can happen on older iPhones overnight),
+    // we'll fall back to retrieving gamesWon from cookies in the loadGame function
     const savedState = localStorage.getItem("gameState");
     if (savedState) {
       try {
         loadGame(JSON.parse(savedState));
-      } catch {
+      } catch (error) {
+        console.error("Failed to load game from localStorage:", error);
+        // The loadGame function will handle fallback to cookies internally
         initGame();
       }
     } else {
+      // No saved state, start a new game
+      // The GameStateProvider will handle loading gamesWon from cookies if available
       initGame();
     }
   }, [loadGame, initGame]);
@@ -45,7 +52,7 @@ export default function Game() {
       {state.debugMode && <DebugPanel />}
 
       {/* Win animations */}
-      <WinAnimations isWon={state.gameWon} gamesWon={state.gamesWon} />
+      <WinAnimations isWon={state.gameWon ?? false} gamesWon={state.gamesWon} />
 
       <div className="fixed bottom-0 left-0 right-0 p-4 z-50" style={{ pointerEvents: "none" }}>
         <div className="flex justify-between items-center">
@@ -55,10 +62,10 @@ export default function Game() {
           
           <AnimatePresence mode="wait">
             <motion.div 
-              key={state.gameWon ? "win" : "normal"}
+              key={(state.gameWon ?? false) ? "win" : "normal"}
               className="wooden-ui" 
               style={{ pointerEvents: "auto" }}
-              animate={state.gameWon ? {
+              animate={(state.gameWon ?? false) ? {
                 scale: [1, 1.2, 1],
                 transition: { 
                   duration: 1.5, 
@@ -68,11 +75,11 @@ export default function Game() {
               } : {}}
             >
               <h1 className="text-2xl font-bold text-center text-amber-100">
-                {state.gameWon ? "YOU WON!" : "Fifteen"}
+                {(state.gameWon ?? false) ? "YOU WON!" : "Fifteen"}
               </h1>
               <motion.p 
                 className="text-sm text-amber-200 text-center"
-                animate={state.gameWon ? {
+                animate={(state.gameWon ?? false) ? {
                   scale: [1, 1.3, 1],
                   color: [
                     "rgb(253, 230, 138)", // amber-200
