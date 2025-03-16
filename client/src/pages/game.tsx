@@ -156,7 +156,7 @@ export default function Game() {
       <div className="h-full flex items-start justify-center">
         <Board />
       </div>
-
+      
       {state.debugMode && <DebugPanel />}
 
       {/* Win animations */}
@@ -164,8 +164,12 @@ export default function Game() {
 
       {/* Footer controls - hidden in landscape mode */}
       <div 
-        className={`fixed bottom-0 left-0 right-0 p-4 z-50 footer-controls ${isLandscape ? 'hidden' : ''}`} 
-        style={{ pointerEvents: "none" }}
+        className={`fixed bottom-0 left-0 right-0 p-4 z-50 footer-controls ${isLandscape ? 'hidden' : ''}`}
+        style={{ 
+          pointerEvents: "none",
+          // Use a more consistent approach for bottom padding in PWA mode
+          paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))'
+        }}
       >
         <div className="flex justify-between items-center">
           <div className="wooden-ui" style={{ pointerEvents: "auto" }}>

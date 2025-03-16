@@ -386,35 +386,89 @@ export function Board() {
           maxCardHeight
         });
       } else {
-        // PORTRAIT MODE: Keep the existing calculation
-        // Portrait mode: 5 cards in each row
-        maxCardWidth = (availableWidth - (horizontalGapSize * 4)) / 5;
+        // PORTRAIT MODE: Use a similar approach to landscape mode, but for 3 rows
         
-        // For height: account for 3 rows with stacking
-        // Adjust stacking factor based on device
-        const stackingFactor = isOlderIOS ? 1.85 : 1.75;
+        // First, determine the offset for stacked cards (how much of each card is visible)
+        const stackingOffset = 0.25; // 25% of card height is visible for stacked cards
         
-        // Calculate height assuming maximum stacking (5 cards per pile)
-        maxCardHeight = (adjustedHeight - (verticalGapSize * 2)) / (3 * stackingFactor);
+        // For each row, we need space for stacked cards (1 full + up to 4 partial)
+        // Calculate how much vertical space is needed for a stack of 5 cards
+        // Formula: full_card_height + (num_stacked_cards - 1) * offset * full_card_height
+        // This simplifies to: full_card_height * (1 + (num_stacked_cards - 1) * offset)
         
-        // Card should maintain a 3:4 aspect ratio (width:height)
-        const idealAspectRatio = 3/4;
+        // For 5 cards with 25% offset: full_card_height * (1 + 4 * 0.25) = full_card_height * 2
+        const stackHeightFactor = 1 + (5 - 1) * stackingOffset; // For 5 cards per pile
         
-        // Determine limiting dimension
-        const heightFromWidth = maxCardWidth / idealAspectRatio;
-        if (heightFromWidth <= maxCardHeight) {
-          maxCardHeight = heightFromWidth;
+        // Total vertical space needed: 
+        // Row 1 stack + gap + Row 2 stack + gap + Row 3 stack
+        // = stackHeightFactor * card_height + gap + stackHeightFactor * card_height + gap + stackHeightFactor * card_height
+        
+        // Add top and bottom padding to ensure cards don't touch the edges
+        const topPadding = 30; // 30px padding at top
+        const bottomPadding = isOlderIOS ? 140 : 120; // Bottom padding for footer
+        
+        // Calculate usable height
+        const usableHeight = window.innerHeight - topPadding - bottomPadding;
+        
+        // Accounting for the gaps between rows (using verticalGapSize)
+        // Solve for card_height:
+        // usableHeight = 3 * stackHeightFactor * card_height + 2 * verticalGapSize
+        // card_height = (usableHeight - 2 * verticalGapSize) / (3 * stackHeightFactor)
+        
+        const maxCardHeightFromVertical = (usableHeight - (2 * verticalGapSize)) / (3 * stackHeightFactor);
+        
+        // Calculate the maximum card width based on available horizontal space
+        // For each row: 5 cards with 4 gaps between them
+        const maxCardWidthFromHorizontal = (availableWidth - (horizontalGapSize * 4)) / 5;
+        
+        // Apply the aspect ratio constraint (width:height = 3:4)
+        const idealAspectRatio = 3/4; // width:height
+        
+        // Calculate the height that would result from the max width
+        const heightFromMaxWidth = maxCardWidthFromHorizontal / idealAspectRatio;
+        
+        // Choose the smaller of the two heights to ensure cards fit both horizontally and vertically
+        let finalCardWidth, finalCardHeight;
+        
+        if (heightFromMaxWidth <= maxCardHeightFromVertical) {
+          // Width is the limiting factor
+          finalCardHeight = heightFromMaxWidth;
+          finalCardWidth = maxCardWidthFromHorizontal;
         } else {
-          maxCardWidth = maxCardHeight * idealAspectRatio;
+          // Height is the limiting factor
+          finalCardHeight = maxCardHeightFromVertical;
+          finalCardWidth = maxCardHeightFromVertical * idealAspectRatio;
         }
         
-        // Apply safety factor
-        const safetyFactor = isOlderIOS ? 0.9 : 0.92;
-        maxCardWidth *= safetyFactor;
-        maxCardHeight *= safetyFactor;
+        // Apply a safety factor to ensure cards don't touch the edges
+        const safetyFactor = isOlderIOS ? 0.9 : 0.95;
+        maxCardWidth = finalCardWidth * safetyFactor;
+        maxCardHeight = finalCardHeight * safetyFactor;
         
         // Calculate the exact grid width for portrait mode (5 cards)
         exactGridWidth = (maxCardWidth * 5) + (horizontalGapSize * 4);
+        
+        // Store the stacking offset as a CSS variable so it can be used by the Pile component
+        document.documentElement.style.setProperty('--stacking-offset', `${stackingOffset}`);
+        
+        // Log detailed information for debugging
+        console.log('Portrait card calculation:', {
+          availableWidth,
+          availableHeight,
+          usableHeight,
+          topPadding,
+          bottomPadding,
+          stackingOffset,
+          stackHeightFactor,
+          maxCardHeightFromVertical,
+          maxCardWidthFromHorizontal,
+          heightFromMaxWidth,
+          finalCardWidth,
+          finalCardHeight,
+          maxCardWidth,
+          maxCardHeight,
+          safetyFactor
+        });
       }
       
       // Log the calculated dimensions for debugging
@@ -644,7 +698,7 @@ export function Board() {
           style={{ 
             width: 'var(--sidebar-width, 20%)',
             minWidth: '100px',
-            padding: '20px 10px',
+            padding: '30px 10px', // Increased top/bottom padding from 20px to 30px
             height: '100%',
             maxHeight: '100vh'
           }}
@@ -711,15 +765,26 @@ export function Board() {
 
   // Render portrait layout (5 piles in each row)
   const renderPortraitLayout = () => {
+    // Calculate row gap based on available space
+    const rowGap = Math.max(10, Math.min(16, cardSize.height * 0.08));
+    
     return (
-      <>
+      <div className="portrait-layout" style={{ 
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: `${rowGap}px`,
+        // Center the layout vertically
+        justifyContent: 'center',
+        // Add a small amount of top margin to ensure cards don't touch the top edge
+        marginTop: '10px'
+      }}>
         <div 
           key={`row1-${layoutKey}`}
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(5, 1fr)",
-            gap: "var(--horizontal-gap, 10px)",
-            marginBottom: verticalSpacing > 0 ? `${verticalSpacing}px` : "var(--vertical-gap, 12px)"
+            gap: "var(--horizontal-gap, 10px)"
           }}
         >
           {state.piles.slice(0, 5).map((pile) => (
@@ -729,6 +794,7 @@ export function Board() {
               onCardClick={(pileId) => makeMove(pileId)}
               cardSize={cardSize}
               isOlderIOS={isOlderIOS}
+              stackingOffset={0.25} // Use consistent stacking offset
             >
               {pile.isEmpty && (
                 <div 
@@ -749,8 +815,7 @@ export function Board() {
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(5, 1fr)",
-            gap: "var(--horizontal-gap, 10px)",
-            marginBottom: verticalSpacing > 0 ? `${verticalSpacing}px` : "var(--vertical-gap, 12px)"
+            gap: "var(--horizontal-gap, 10px)"
           }}
         >
           {state.piles.slice(5, 10).map((pile) => (
@@ -760,6 +825,7 @@ export function Board() {
               onCardClick={(pileId) => makeMove(pileId)}
               cardSize={cardSize}
               isOlderIOS={isOlderIOS}
+              stackingOffset={0.25} // Use consistent stacking offset
             >
               {pile.isEmpty && (
                 <div 
@@ -790,6 +856,7 @@ export function Board() {
               onCardClick={(pileId) => makeMove(pileId)}
               cardSize={cardSize}
               isOlderIOS={isOlderIOS}
+              stackingOffset={0.25} // Use consistent stacking offset
             >
               {pile.isEmpty && (
                 <div 
@@ -804,20 +871,21 @@ export function Board() {
             </Pile>
           ))}
         </div>
-      </>
+      </div>
     );
   };
 
   return (
     <div 
       ref={containerRef}
-      className={`flex ${isLandscape ? 'justify-start' : 'justify-center'} items-start w-full`}
+      className={`flex ${isLandscape ? 'justify-start' : 'justify-center'} items-center w-full h-full`}
       style={{
-        paddingBottom: isLandscape ? "0" : "80px", // Only add padding in portrait mode
-        minHeight: isLandscape ? "100vh" : "calc(100vh - 80px)", // Full height in landscape
         // Add a transition style to prevent flickering
         opacity: isTransitioning ? "0.3" : "1",
-        transition: "opacity 0.2s ease-in-out"
+        transition: "opacity 0.2s ease-in-out",
+        // Use minimal padding to maximize available space
+        paddingTop: isLandscape ? "0" : "10px",
+        paddingBottom: isLandscape ? "0" : "10px" // Minimal padding, card sizing accounts for footer
       }}
     >
       {isLandscape ? (
@@ -832,13 +900,13 @@ export function Board() {
             userSelect: "none",
             width: initialCalculationDone ? `${gridWidth}px` : "95%",
             maxWidth: "95vmin",
-            paddingTop: "2vmin",
-            paddingBottom: "10vmin", // Adjust padding to prevent cards from being cut off
+            // Center the board vertically
             display: "flex",
             flexDirection: "column",
-            justifyContent: "flex-start",
-            gap: "1vh",
-            marginTop: "1vh",
+            justifyContent: "center",
+            alignItems: "center",
+            // Ensure the board has enough height
+            height: "100%"
           }}
         >
           {renderPortraitLayout()}
