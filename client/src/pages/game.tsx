@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Board } from "@/components/game/board";
 import { Menu } from "@/components/game/menu";
 import { DebugPanel } from "@/components/game/debug-panel";
@@ -8,12 +8,117 @@ import { Button } from "@/components/ui/button";
 import { Undo2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Enum to track tap locations for the cheat code
+enum TapLocation {
+  GamesWonBox = 'gamesWonBox',
+  TopScreen = 'topScreen'
+}
+
 export default function Game() {
-  const { state, undo, initGame, loadGame } = useGameState();
+  const { state, undo, initGame, loadGame, instantWin } = useGameState();
   const [showWinDialog, setShowWinDialog] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isPWA, setIsPWA] = useState(false);
+  
+  // State for tracking the tap-based cheat code
+  const [tapSequence, setTapSequence] = useState<TapLocation[]>([]);
+  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const gamesWonBoxRef = useRef<HTMLDivElement>(null);
+  
+  // Function to handle taps for the cheat code
+  const handleTap = useCallback((location: TapLocation) => {
+    // Don't activate if game is already won
+    if (state.gameWon) return;
+    
+    setTapSequence(prev => {
+      const newSequence = [...prev, location];
+      
+      // Check if the sequence is valid (alternating between GamesWonBox and TopScreen)
+      const isValidSequence = newSequence.every((loc, index) => {
+        if (index % 2 === 0) {
+          return loc === TapLocation.GamesWonBox;
+        } else {
+          return loc === TapLocation.TopScreen;
+        }
+      });
+      
+      // If the sequence is invalid, reset it
+      if (!isValidSequence) {
+        return [];
+      }
+      
+      // If we have 6 taps in the correct alternating sequence, trigger the cheat
+      if (newSequence.length === 6) {
+        // Add a subtle visual feedback
+        const flashElement = document.createElement('div');
+        flashElement.style.position = 'fixed';
+        flashElement.style.top = '0';
+        flashElement.style.left = '0';
+        flashElement.style.width = '100%';
+        flashElement.style.height = '100%';
+        flashElement.style.backgroundColor = 'rgba(255, 215, 0, 0.2)'; // Gold color
+        flashElement.style.zIndex = '9999';
+        flashElement.style.pointerEvents = 'none';
+        flashElement.style.transition = 'opacity 0.5s ease-out';
+        document.body.appendChild(flashElement);
+        
+        // Fade out and remove the flash element
+        setTimeout(() => {
+          flashElement.style.opacity = '0';
+          setTimeout(() => {
+            document.body.removeChild(flashElement);
+          }, 500);
+        }, 100);
+        
+        // Trigger the instant win
+        instantWin();
+        
+        // Reset the sequence
+        return [];
+      }
+      
+      // Reset the sequence after 3 seconds of inactivity
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+      }
+      
+      tapTimeoutRef.current = setTimeout(() => {
+        setTapSequence([]);
+      }, 3000);
+      
+      return newSequence;
+    });
+  }, [state.gameWon, instantWin]);
+  
+  // Handle top screen area tap
+  const handleTopScreenTap = useCallback((e: React.TouchEvent) => {
+    // Only consider taps in the top 1/5 of the screen
+    const touchY = e.touches[0].clientY;
+    const screenHeight = window.innerHeight;
+    
+    if (touchY < screenHeight / 5) {
+      handleTap(TapLocation.TopScreen);
+    } else {
+      // Reset sequence if tapped elsewhere
+      setTapSequence([]);
+    }
+  }, [handleTap]);
+  
+  // Handle Games Won box tap
+  const handleGamesWonBoxTap = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation(); // Prevent the tap from triggering other handlers
+    handleTap(TapLocation.GamesWonBox);
+  }, [handleTap]);
+  
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     // Check if running on iOS
@@ -160,7 +265,10 @@ export default function Game() {
   }, [initGame]);
 
   return (
-    <div className="fixed inset-0 overflow-hidden felt-background">
+    <div 
+      className="fixed inset-0 overflow-hidden felt-background"
+      onTouchStart={handleTopScreenTap}
+    >
       {/* Simple noise texture */}
       <div className="absolute inset-0 noise-texture" />
       
@@ -211,6 +319,8 @@ export default function Game() {
                   repeatType: "reverse"
                 }
               } : {}}
+              ref={gamesWonBoxRef}
+              onTouchStart={handleGamesWonBoxTap}
             >
               <h1 className="text-2xl font-bold text-center text-amber-100">
                 {(state.gameWon ?? false) ? "YOU WON!" : "Fifteen"}
