@@ -164,7 +164,13 @@ export function WinAnimations({ isWon, gamesWon }: WinAnimationsProps) {
         cardsArray.forEach((card) => {
           const element = card as HTMLElement;
           element.style.willChange = 'transform, opacity';
+          // Set initial state for smooth transition
+          element.style.transition = 'none';
+          element.style.opacity = '1';
         });
+        
+        // Force reflow to ensure the initial state is applied before animations start
+        document.body.offsetHeight;
         
         // Animate cards flying off with a slight delay
         cardsArray.forEach((card, index) => {
@@ -177,9 +183,22 @@ export function WinAnimations({ isWon, gamesWon }: WinAnimationsProps) {
             
             // Apply the animation with hardware acceleration
             const element = card as HTMLElement;
-            element.style.transition = 'transform 1s ease-in, opacity 0.8s ease-in';
+            
+            // Set a shorter opacity transition to ensure cards fade out before they stop moving
+            element.style.transition = 'transform 1s ease-in, opacity 0.6s ease-in';
+            
+            // Start the animation
             element.style.transform = `translate3d(${randomX}px, ${randomY}px, 0) rotate3d(0, 0, 1, ${randomRotation}deg)`;
             element.style.opacity = '0';
+            
+            // Add a mid-flight check to ensure opacity is set to 0
+            const midFlightCheckId = setTimeout(() => {
+              // Force opacity to 0 halfway through the animation
+              if (element.style.opacity !== '0') {
+                element.style.opacity = '0';
+              }
+            }, 500);
+            animationTimeoutsRef.current.push(midFlightCheckId);
             
             // Ensure cards are fully removed from view after animation
             const cleanupId = setTimeout(() => {
