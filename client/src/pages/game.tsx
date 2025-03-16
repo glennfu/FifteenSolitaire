@@ -12,8 +12,19 @@ export default function Game() {
   const { state, undo, initGame, loadGame } = useGameState();
   const [showWinDialog, setShowWinDialog] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [isPWA, setIsPWA] = useState(false);
 
   useEffect(() => {
+    // Check if running on iOS
+    const isIOSDevice = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    setIsIOS(isIOSDevice);
+    
+    // Check if running as PWA
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                         (window.navigator as any).standalone === true;
+    setIsPWA(isStandalone);
+    
     // Try to load from localStorage first
     // If localStorage fails (which can happen on older iPhones overnight),
     // we'll fall back to retrieving gamesWon from cookies in the loadGame function
@@ -153,6 +164,17 @@ export default function Game() {
       {/* Simple noise texture */}
       <div className="absolute inset-0 noise-texture" />
       
+      {/* Status bar transition for iOS devices */}
+      {isIOS && (
+        <div 
+          className="absolute top-0 left-0 right-0 z-10 pointer-events-none"
+          style={{
+            height: '80px',
+            background: 'linear-gradient(to bottom, rgba(13, 92, 46, 1) 0%, rgba(13, 92, 46, 0.8) 30%, rgba(26, 108, 61, 0.3) 70%, rgba(26, 108, 61, 0) 100%)'
+          }}
+        />
+      )}
+      
       <div className="h-full flex items-start justify-center">
         <Board />
       </div>
@@ -168,7 +190,7 @@ export default function Game() {
         style={{ 
           pointerEvents: "none",
           // Use a more consistent approach for bottom padding in PWA mode
-          paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))'
+          paddingBottom: 'max(30px, env(safe-area-inset-bottom, 30px))'
         }}
       >
         <div className="flex justify-between items-center">
